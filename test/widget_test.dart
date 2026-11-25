@@ -377,8 +377,15 @@ void main() {
     await tester.pump(Duration(milliseconds: (800 - scene().tick) * 125));
     await tester.pumpAndSettle();
     expect(find.text('전체 결과'), findsOneWidget);
-    expect(find.text('추천 연습 · 후렴 2 · 앞줄 미합류'), findsOneWidget);
-    await tapLabel('후렴 2 연습 · 7/30');
+    expect(find.text('동네 축제 완료'), findsOneWidget);
+    expect(find.text('추천 연습'), findsOneWidget);
+    expect(find.textContaining('동시 떼창'), findsNothing);
+    await tapLabel('후렴 1');
+    expect(find.text('후렴 1 연습'), findsOneWidget);
+    await tapLabel('후렴 2');
+    expect(find.text('후렴 1 연습'), findsNothing);
+    expect(find.textContaining('앞줄 미합류'), findsOneWidget);
+    await tapLabel('후렴 2 연습');
     expect(find.text('후렴 2 연습'), findsOneWidget);
     expect(
       tester

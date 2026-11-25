@@ -1252,7 +1252,7 @@ class _ResultSoundState extends State<_ResultSound>
   Widget build(BuildContext context) => widget.child;
 }
 
-class _ResultsScreen extends StatelessWidget {
+class _ResultsScreen extends StatefulWidget {
   const _ResultsScreen({
     required this.records,
     required this.score,
@@ -1276,89 +1276,309 @@ class _ResultsScreen extends StatelessWidget {
   final bool saved;
 
   @override
+  State<_ResultsScreen> createState() => _ResultsScreenState();
+}
+
+class _ResultsScreenState extends State<_ResultsScreen> {
+  int? _expandedChorus;
+
+  @override
   Widget build(BuildContext context) {
-    final recommended = recommendedChorusPractice(results);
-    final lost = comboBreak;
+    final recommended = recommendedChorusPractice(widget.results);
+    final lost = widget.comboBreak;
+    final venue = widget.venue;
+    final nextVenue =
+        venue == FestivalVenue.neighborhood &&
+        widget.missionAchieved &&
+        widget.records.nightMarketUnlocked;
+    final compact = MediaQuery.sizeOf(context).height < 480;
     return _Screen(
       title: '전체 결과',
+      compact: compact,
       children: [
-        PerformanceScore(score: score),
-        Text('이번 공연 최고 콤보 $bestCombo박', style: const TextStyle(color: _muted)),
-        Text(
-          '${missionAchieved ? '목표 달성' : '목표'} · ${venue.mission}',
-          style: TextStyle(color: missionAchieved ? _mint : _muted),
+        _ResultsHero(
+          venue: venue,
+          score: widget.score,
+          combo: widget.bestCombo,
+          missionAchieved: widget.missionAchieved,
+          compact: compact,
         ),
-        if (!saved) const Text('최고 기록을 저장하지 못했어요.'),
-        if (venue == FestivalVenue.neighborhood &&
-            missionAchieved &&
-            records.nightMarketUnlocked)
+        if (!widget.saved) const Text('최고 기록을 저장하지 못했어요.'),
+        if (nextVenue)
           _Action(
             '다음 무대 · 야외 야시장',
             () => _open(
               context,
               _PerformanceScreen(
-                records: records,
+                records: widget.records,
                 venue: FestivalVenue.nightMarket,
-                returnHome: returnHome,
+                returnHome: widget.returnHome,
               ),
               replace: true,
             ),
             primary: true,
           ),
-        if (lost != null) ...[
-          Text(
-            '${lost.combo}콤보 끊김 · 후렴 ${lost.chorus} ${lost.beat}박 · ${lost.zoneLabel}',
-          ),
-          _Action(
-            '끊기기 3초 전부터 연습',
-            () => _open(
-              context,
-              _PerformanceScreen(
-                records: records,
-                venue: venue,
-                recovery: lost,
-              ),
-            ),
-          ),
-        ],
-        for (final result in results) ...[
-          ChorusSummary(
+        const Text(
+          '후렴별 기록',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+        ),
+        for (final result in widget.results)
+          _ChorusResultCard(
             result: result,
             recommended: identical(recommended, result),
-          ),
-          _Action(
-            '후렴 ${result.chorus} 연습 · ${result.score}/30',
-            () => _open(
+            expanded: _expandedChorus == result.chorus,
+            onToggle: () => setState(() {
+              _expandedChorus = _expandedChorus == result.chorus
+                  ? null
+                  : result.chorus;
+            }),
+            onPractice: () => _open(
               context,
               _PerformanceScreen(
-                records: records,
+                records: widget.records,
                 checkpoint: result.checkpoint,
                 venue: venue,
                 previousScore: result.score,
                 previousResult: result,
               ),
             ),
-            primary: identical(recommended, result),
           ),
-        ],
+        if (lost != null)
+          _Action(
+            '끊기기 3초 전부터 연습',
+            () => _open(
+              context,
+              _PerformanceScreen(
+                records: widget.records,
+                venue: venue,
+                recovery: lost,
+              ),
+            ),
+          ),
+        if (lost != null)
+          Text(
+            '${lost.combo}콤보 끊김 · 후렴 ${lost.chorus} ${lost.beat}박 · ${lost.zoneLabel}',
+            style: const TextStyle(color: _muted, fontSize: 13),
+          ),
         _Action(
           '공연 다시 하기',
           () => _open(
             context,
             _PerformanceScreen(
-              records: records,
-              returnHome: returnHome,
+              records: widget.records,
+              returnHome: widget.returnHome,
               venue: venue,
             ),
             replace: true,
           ),
-          primary: true,
+          primary: !nextVenue,
         ),
         _Action(
-          returnHome ? '시작 화면으로' : '공연 선택으로',
+          widget.returnHome ? '시작 화면으로' : '공연 선택으로',
           () => Navigator.of(context).pop(),
         ),
       ],
+    );
+  }
+}
+
+class _ResultsHero extends StatelessWidget {
+  const _ResultsHero({
+    required this.venue,
+    required this.score,
+    required this.combo,
+    required this.missionAchieved,
+    required this.compact,
+  });
+
+  final FestivalVenue venue;
+  final int score;
+  final int combo;
+  final bool missionAchieved;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              venue.posterAsset,
+              fit: BoxFit.cover,
+              alignment: const Alignment(0, .18),
+              excludeFromSemantics: true,
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                  colors: [Color(0x70171329), Color(0xEC171329), _night],
+                  stops: [0, .59, 1],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(compact ? 14 : 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '${venue.title} 완료',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+                SizedBox(height: compact ? 5 : 10),
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.end,
+                  spacing: 14,
+                  runSpacing: 4,
+                  children: [
+                    Semantics(
+                      label: '공연 점수 $score점, 90점 만점',
+                      excludeSemantics: true,
+                      child: Text.rich(
+                        TextSpan(
+                          text: '$score',
+                          style: TextStyle(
+                            color: _gold,
+                            fontSize: compact ? 36 : 48,
+                            height: 1,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: ' / 90',
+                              style: TextStyle(
+                                color: _paper,
+                                fontSize: compact ? 16 : 19,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '최고 $combo콤보',
+                      style: const TextStyle(
+                        color: _mint,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  missionAchieved ? '✓ 목표 달성' : venue.mission,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: missionAchieved ? _mint : _muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChorusResultCard extends StatelessWidget {
+  const _ChorusResultCard({
+    required this.result,
+    required this.recommended,
+    required this.expanded,
+    required this.onToggle,
+    required this.onPractice,
+  });
+
+  final ChorusResult result;
+  final bool recommended;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final VoidCallback onPractice;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF24203A),
+        border: Border.all(
+          color: recommended
+              ? const Color(0x907A624C)
+              : const Color(0xFF403650),
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            expanded: expanded,
+            child: CupertinoButton(
+              minimumSize: const Size(48, 48),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              foregroundColor: _paper,
+              onPressed: onToggle,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          '후렴 ${result.chorus}',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        if (recommended)
+                          const Text(
+                            '추천 연습',
+                            style: TextStyle(color: _gold, fontSize: 12),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${result.score}/30',
+                    style: const TextStyle(color: _mint, fontSize: 15),
+                  ),
+                  const SizedBox(width: 9),
+                  Icon(
+                    expanded
+                        ? CupertinoIcons.chevron_up
+                        : CupertinoIcons.chevron_down,
+                    color: _muted,
+                    size: 13,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (expanded) ...[
+            ChorusSummary(result: result),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: _Action(
+                '후렴 ${result.chorus} 연습',
+                onPractice,
+                primary: true,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

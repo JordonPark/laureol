@@ -29,24 +29,9 @@ ChorusResult? recommendedChorusPractice(List<ChorusResult> results) {
 }
 
 class ChorusSummary extends StatelessWidget {
-  const ChorusSummary({
-    super.key,
-    required this.result,
-    this.recommended = false,
-  });
+  const ChorusSummary({super.key, required this.result});
 
   final ChorusResult result;
-  final bool recommended;
-
-  String get _practiceHint {
-    final front = result.firstBeat(FestivalZone.front);
-    final back = result.firstBeat(FestivalZone.back);
-    if (front == null && back == null) return '두 구역 미합류';
-    if (front == null) return '앞줄 미합류';
-    if (back == null) return '뒷줄 미합류';
-    final later = front < back ? '뒷줄' : '앞줄';
-    return '$later이 ${(front - back).abs()}박 뒤에 합류';
-  }
 
   String get _start {
     final front = result.firstBeat(FestivalZone.front);
@@ -63,24 +48,15 @@ class ChorusSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const ink = Color(0xFFF7F2FF);
-    const amber = Color(0xFFFFC46A);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF24203A),
-        border: recommended ? Border.all(color: amber) : null,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (recommended) ...[
-            Text(
-              '추천 연습 · 후렴 ${result.chorus} · $_practiceHint',
-              style: const TextStyle(color: amber, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-          ],
           Text(_start, style: const TextStyle(color: ink)),
           const SizedBox(height: 6),
           Text(

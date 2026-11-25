@@ -25,7 +25,6 @@ class VenueCard extends StatelessWidget {
     final accent = neighborhood
         ? const Color(0xFFFFC46A)
         : const Color(0xFF7CE0C2);
-    final image = neighborhood ? 'venue-neighborhood.png' : 'venue-market.png';
     final objective = Text(
       locked ? '동네 축제에서 두 줄 8박 연속 떼창으로 해금' : venue.mission,
       style: TextStyle(
@@ -63,7 +62,7 @@ class VenueCard extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 Image.asset(
-                  'docs/art/festival/$image',
+                  venue.posterAsset,
                   fit: BoxFit.cover,
                   alignment: const Alignment(0, .18),
                   excludeFromSemantics: true,

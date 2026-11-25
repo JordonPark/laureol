@@ -18,13 +18,16 @@ enum FestivalZone { front, back }
 enum FestivalCue { call, applause, singalong, generatorStop }
 
 enum FestivalVenue {
-  neighborhood('동네 축제', '두 줄이 8박 연속 떼창하기'),
-  nightMarket('야외 야시장', '발전기가 꺼진 뒤 4박 안에 두 줄 합류시키기');
+  neighborhood('동네 축제', '두 줄이 8박 연속 떼창하기', 'venue-neighborhood.png'),
+  nightMarket('야외 야시장', '발전기가 꺼진 뒤 4박 안에 두 줄 합류시키기', 'venue-market.png');
 
-  const FestivalVenue(this.title, this.mission);
+  const FestivalVenue(this.title, this.mission, this.poster);
 
   final String title;
   final String mission;
+  final String poster;
+
+  String get posterAsset => 'docs/art/festival/$poster';
 }
 
 String _missingLabel(int mask) => switch (mask) {
