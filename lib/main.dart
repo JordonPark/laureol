@@ -932,7 +932,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         switch (status) {
           CrowdStatus.loud => '오른쪽 노브를 아래로 밀어 민트색 구간에 맞춰요.',
           CrowdStatus.ready => '✓ 준비! 여기서 손을 떼세요.',
-          _ => '오른쪽 노브를 위로 밀어 민트색 구간에 맞춰요.',
+          _ => '오른쪽 노브를 위로 밀어요. 짧게 여러 번 밀어도 돼요.',
         },
       ),
       _RehearsalStep.signal => ('이제 관객에게 신호를 보내요', '아래 노란 라우럴!을 누르고 뒷줄을 보세요.'),

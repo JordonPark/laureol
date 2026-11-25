@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/widgets.dart';
 
 const _ink = Color(0xFFF6F0E7);
@@ -103,6 +104,7 @@ class ZoneVolumeSlider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final band = target;
+    final step = vertical ? 1 : 5;
     void adjustBy(int delta) {
       onChanged((value + delta).clamp(0, 100));
       onInteractionEnd?.call();
@@ -115,156 +117,222 @@ class ZoneVolumeSlider extends StatelessWidget {
           : '$value%, 준비 구간 ${band.minimum}%에서 ${band.maximum}%',
       enabled: enabled,
       increasedValue: enabled && value < 100
-          ? '${(value + 5).clamp(0, 100)}%'
+          ? '${(value + step).clamp(0, 100)}%'
           : null,
       decreasedValue: enabled && value > 0
-          ? '${(value - 5).clamp(0, 100)}%'
+          ? '${(value - step).clamp(0, 100)}%'
           : null,
       slider: true,
-      onIncrease: enabled && value < 100 ? () => adjustBy(5) : null,
-      onDecrease: enabled && value > 0 ? () => adjustBy(-5) : null,
+      onIncrease: enabled && value < 100 ? () => adjustBy(step) : null,
+      onDecrease: enabled && value > 0 ? () => adjustBy(-step) : null,
       child: ExcludeSemantics(
-        child: Column(
-          children: [
-            if (!vertical)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: vertical
+            ? _VolumeDialGesture(
+                value: value,
+                band: band,
+                highlighted: highlighted,
+                enabled: enabled,
+                onChanged: onChanged,
+                onInteractionEnd: onInteractionEnd,
+              )
+            : Column(
                 children: [
-                  Text(
-                    '볼륨',
-                    style: TextStyle(color: highlighted ? _amber : _muted),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '볼륨',
+                        style: TextStyle(color: highlighted ? _amber : _muted),
+                      ),
+                      Text('$value%', style: const TextStyle(color: _ink)),
+                    ],
                   ),
-                  Text('$value%', style: const TextStyle(color: _ink)),
+                  SizedBox(
+                    height: 48,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        const thumb = 20.0;
+                        final length = constraints.maxWidth;
+                        final track = length - thumb;
+                        if (track <= 0) return const SizedBox.shrink();
+                        final filled = track * value / 100;
+
+                        void update(double x) {
+                          onChanged(
+                            ((x - thumb / 2) / track * 100).round().clamp(
+                              0,
+                              100,
+                            ),
+                          );
+                        }
+
+                        final graphics = SizedBox(
+                          width: length,
+                          height: 48,
+                          child: Stack(
+                            alignment: Alignment.centerLeft,
+                            children: [
+                              Positioned(
+                                left: thumb / 2,
+                                width: track,
+                                height: 8,
+                                child: const ColoredBox(color: _line),
+                              ),
+                              Positioned(
+                                left: thumb / 2,
+                                width: filled,
+                                height: 8,
+                                child: ColoredBox(
+                                  color: highlighted
+                                      ? _amber
+                                      : enabled
+                                      ? _mint
+                                      : _muted,
+                                ),
+                              ),
+                              if (band != null)
+                                Positioned(
+                                  left: thumb / 2 + track * band.minimum / 100,
+                                  width:
+                                      track *
+                                      (band.maximum - band.minimum) /
+                                      100,
+                                  height: 16,
+                                  child: const ColoredBox(color: _mint),
+                                ),
+                              if (highlighted &&
+                                  band != null &&
+                                  (value < band.minimum ||
+                                      value > band.maximum))
+                                Positioned.fill(
+                                  child: CustomPaint(
+                                    painter: _VolumeCuePainter(
+                                      from: filled + thumb / 2,
+                                      toward:
+                                          (band.minimum + band.maximum) /
+                                              2 *
+                                              track /
+                                              100 +
+                                          thumb / 2,
+                                    ),
+                                  ),
+                                ),
+                              Positioned(
+                                left: filled,
+                                width: thumb,
+                                height: thumb,
+                                child: ColoredBox(
+                                  color: highlighted
+                                      ? _amber
+                                      : enabled
+                                      ? _ink
+                                      : _muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                        return GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTapDown: enabled
+                              ? (details) => update(details.localPosition.dx)
+                              : null,
+                          onTapUp: enabled && onInteractionEnd != null
+                              ? (_) => onInteractionEnd!()
+                              : null,
+                          onHorizontalDragStart: enabled
+                              ? (details) => update(details.localPosition.dx)
+                              : null,
+                          onHorizontalDragUpdate: enabled
+                              ? (details) => update(details.localPosition.dx)
+                              : null,
+                          onHorizontalDragEnd:
+                              enabled && onInteractionEnd != null
+                              ? (_) => onInteractionEnd!()
+                              : null,
+                          child: graphics,
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
-            SizedBox(
-              height: vertical ? 88 : 48,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  const thumb = 20.0;
-                  final length = vertical
-                      ? constraints.maxHeight
-                      : constraints.maxWidth;
-                  final track = length - thumb;
-                  if (track <= 0) return const SizedBox.shrink();
-                  final filled = track * value / 100;
+      ),
+    );
+  }
+}
 
-                  void update(double x) {
-                    onChanged(
-                      ((x - thumb / 2) / track * 100).round().clamp(0, 100),
-                    );
-                  }
+class _VolumeDialGesture extends StatefulWidget {
+  const _VolumeDialGesture({
+    required this.value,
+    required this.band,
+    required this.highlighted,
+    required this.enabled,
+    required this.onChanged,
+    required this.onInteractionEnd,
+  });
 
-                  double position(Offset point) =>
-                      vertical ? length - point.dy : point.dx;
-                  void dragStart(DragStartDetails details) =>
-                      update(position(details.localPosition));
-                  void dragUpdate(DragUpdateDetails details) =>
-                      update(position(details.localPosition));
-                  final end = enabled && onInteractionEnd != null
-                      ? (DragEndDetails _) => onInteractionEnd!()
-                      : null;
-                  final graphics = SizedBox(
-                    width: length,
-                    height: 48,
-                    child: Stack(
-                      alignment: Alignment.centerLeft,
-                      children: [
-                        Positioned(
-                          left: thumb / 2,
-                          width: track,
-                          height: 8,
-                          child: const ColoredBox(color: _line),
-                        ),
-                        Positioned(
-                          left: thumb / 2,
-                          width: filled,
-                          height: 8,
-                          child: ColoredBox(
-                            color: highlighted
-                                ? _amber
-                                : enabled
-                                ? _mint
-                                : _muted,
-                          ),
-                        ),
-                        if (band != null)
-                          Positioned(
-                            left: thumb / 2 + track * band.minimum / 100,
-                            width: track * (band.maximum - band.minimum) / 100,
-                            height: 16,
-                            child: const ColoredBox(color: _mint),
-                          ),
-                        if (highlighted &&
-                            band != null &&
-                            (value < band.minimum || value > band.maximum))
-                          Positioned.fill(
-                            child: CustomPaint(
-                              painter: _VolumeCuePainter(
-                                from: filled + thumb / 2,
-                                toward:
-                                    (band.minimum + band.maximum) /
-                                        2 *
-                                        track /
-                                        100 +
-                                    thumb / 2,
-                              ),
-                            ),
-                          ),
-                        Positioned(
-                          left: filled,
-                          width: thumb,
-                          height: thumb,
-                          child: ColoredBox(
-                            color: highlighted
-                                ? _amber
-                                : enabled
-                                ? _ink
-                                : _muted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                  return GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTapDown: enabled
-                        ? (details) => update(position(details.localPosition))
-                        : null,
-                    onTapUp: enabled && onInteractionEnd != null
-                        ? (_) => onInteractionEnd!()
-                        : null,
-                    onHorizontalDragStart: enabled && !vertical
-                        ? dragStart
-                        : null,
-                    onHorizontalDragUpdate: enabled && !vertical
-                        ? dragUpdate
-                        : null,
-                    onHorizontalDragEnd: vertical ? null : end,
-                    onVerticalDragStart: enabled && vertical ? dragStart : null,
-                    onVerticalDragUpdate: enabled && vertical
-                        ? dragUpdate
-                        : null,
-                    onVerticalDragEnd: vertical ? end : null,
-                    child: vertical
-                        ? SizedBox(
-                            width: 60,
-                            height: length,
-                            child: CustomPaint(
-                              painter: _VolumeDialPainter(
-                                value: value,
-                                band: band,
-                                highlighted: highlighted,
-                                enabled: enabled,
-                              ),
-                            ),
-                          )
-                        : graphics,
-                  );
-                },
-              ),
-            ),
-          ],
+  final int value;
+  final ({int minimum, int maximum})? band;
+  final bool highlighted;
+  final bool enabled;
+  final ValueChanged<int> onChanged;
+  final VoidCallback? onInteractionEnd;
+
+  @override
+  State<_VolumeDialGesture> createState() => _VolumeDialGestureState();
+}
+
+class _VolumeDialGestureState extends State<_VolumeDialGesture> {
+  static const _height = 88.0;
+  static const _pixelsPerPoint = 3.0;
+
+  int _startVolume = 0;
+  double _dragDistance = 0;
+
+  void _update(int next) {
+    final value = next.clamp(0, 100);
+    if (value != widget.value) widget.onChanged(value);
+  }
+
+  void _startDrag(DragStartDetails _) {
+    _startVolume = widget.value;
+    _dragDistance = 0;
+  }
+
+  void _drag(DragUpdateDetails details) {
+    _dragDistance -= details.delta.dy;
+    _update(_startVolume + (_dragDistance / _pixelsPerPoint).round());
+  }
+
+  void _tap(TapUpDetails details) {
+    final offset = details.localPosition.dy - _height / 2;
+    if (offset.abs() < 9) return;
+    _update(widget.value + (offset < 0 ? 1 : -1));
+    widget.onInteractionEnd?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      dragStartBehavior: DragStartBehavior.down,
+      onTapUp: widget.enabled ? _tap : null,
+      onVerticalDragStart: widget.enabled ? _startDrag : null,
+      onVerticalDragUpdate: widget.enabled ? _drag : null,
+      onVerticalDragEnd: widget.enabled
+          ? (_) => widget.onInteractionEnd?.call()
+          : null,
+      child: SizedBox(
+        width: 60,
+        height: _height,
+        child: CustomPaint(
+          painter: _VolumeDialPainter(
+            value: widget.value,
+            band: widget.band,
+            highlighted: widget.highlighted,
+            enabled: widget.enabled,
+          ),
         ),
       ),
     );
@@ -352,6 +420,19 @@ class _VolumeDialPainter extends CustomPainter {
         paint
           ..strokeWidth = 2
           ..color = _mint,
+      );
+    }
+    if (enabled) {
+      paint
+        ..color = _muted
+        ..strokeWidth = 1.5;
+      final x = size.width - 8;
+      canvas.drawLine(Offset(x - 3, 9), Offset(x + 3, 9), paint);
+      canvas.drawLine(Offset(x, 6), Offset(x, 12), paint);
+      canvas.drawLine(
+        Offset(x - 3, size.height - 9),
+        Offset(x + 3, size.height - 9),
+        paint,
       );
     }
   }

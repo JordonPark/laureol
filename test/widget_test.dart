@@ -58,8 +58,7 @@ void main() {
     final gesture = await tester.startGesture(
       Offset(track.center.dx, track.top + track.height * .60),
     );
-    await gesture.moveBy(const Offset(0, -20));
-    await gesture.moveTo(track.center);
+    await gesture.moveBy(const Offset(0, -30));
     await tester.pump();
     expect(scene().focusedZone, FestivalZone.back);
     expect(scene().focusedVolume, 50);
@@ -213,11 +212,24 @@ void main() {
               widget is GestureDetector && widget.onVerticalDragUpdate != null,
         ),
       );
-      await tester.tapAt(tester.getCenter(backTrack));
+      final backBounds = tester.getRect(backTrack);
+      await tester.drag(backTrack, const Offset(0, -21));
+      await tester.pump();
+      expect(
+        tester.widget<FestivalScene>(find.byType(FestivalScene)).focusedVolume,
+        47,
+      );
+      await tester.drag(backTrack, const Offset(0, -21));
+      await tester.pump();
+      expect(
+        tester.widget<FestivalScene>(find.byType(FestivalScene)).focusedVolume,
+        54,
+      );
+      await tester.tapAt(Offset(backBounds.center.dx, backBounds.top + 8));
       await tester.pump();
       final focused = tester.widget<FestivalScene>(find.byType(FestivalScene));
       expect(focused.focusedZone, FestivalZone.back);
-      expect(focused.focusedVolume, 50);
+      expect(focused.focusedVolume, 55);
       expect(tester.widget<ZoneControlCard>(cards.last).selected, isTrue);
 
       final stage = tester.widget<FestivalScene>(find.byType(FestivalScene));
@@ -334,7 +346,7 @@ void main() {
     );
     expect(tester.getSize(track).height, greaterThanOrEqualTo(48));
     expect(tester.getSize(track).width, greaterThanOrEqualTo(48));
-    await tester.tapAt(tester.getCenter(track));
+    await tester.drag(track, const Offset(0, -30));
     await tester.pump();
     expect(find.text('✓  준비'), findsNWidgets(2));
 
@@ -428,10 +440,9 @@ void main() {
             widget is GestureDetector && widget.onVerticalDragUpdate != null,
       ),
     );
-    final track = tester.getRect(rearTrack);
     const missedTick = 248;
     await advanceTo(176);
-    await tester.tapAt(track.center);
+    await tester.drag(rearTrack, const Offset(0, -30));
     await tester.pump();
     await tester.tap(find.text('라우럴!').first);
     await advanceTo(240);
@@ -442,7 +453,7 @@ void main() {
     expect(scene().focusedZone, FestivalZone.front);
     expect(find.byType(ZoneVolumeSlider).hitTestable(), findsNWidgets(2));
     await advanceTo(missedTick);
-    await tester.tapAt(Offset(track.center.dx, track.top + track.height * .30));
+    await tester.drag(rearTrack, const Offset(0, -54));
     await advanceTo(252);
     expect(find.text('10 콤보!'), findsNothing);
     await advanceTo(800);
