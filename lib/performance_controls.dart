@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 
 const _ink = Color(0xFFF6F0E7);
@@ -245,7 +247,18 @@ class ZoneVolumeSlider extends StatelessWidget {
                         : null,
                     onVerticalDragEnd: vertical ? end : null,
                     child: vertical
-                        ? RotatedBox(quarterTurns: 3, child: graphics)
+                        ? SizedBox(
+                            width: 60,
+                            height: length,
+                            child: CustomPaint(
+                              painter: _VolumeDialPainter(
+                                value: value,
+                                band: band,
+                                highlighted: highlighted,
+                                enabled: enabled,
+                              ),
+                            ),
+                          )
                         : graphics,
                   );
                 },
@@ -256,6 +269,99 @@ class ZoneVolumeSlider extends StatelessWidget {
       ),
     );
   }
+}
+
+class _VolumeDialPainter extends CustomPainter {
+  const _VolumeDialPainter({
+    required this.value,
+    required this.band,
+    required this.highlighted,
+    required this.enabled,
+  });
+
+  final int value;
+  final ({int minimum, int maximum})? band;
+  final bool highlighted;
+  final bool enabled;
+
+  static const _start = 3 * math.pi / 4;
+  static const _sweep = 3 * math.pi / 2;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final origin = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 6;
+    final ring = Rect.fromCircle(center: origin, radius: radius);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..color = _line;
+    canvas.drawArc(ring, _start, _sweep, false, paint);
+    final angle = _start + _sweep * value / 100;
+    if (band case final target?) {
+      canvas.drawArc(
+        ring,
+        _start + _sweep * target.minimum / 100,
+        _sweep * (target.maximum - target.minimum) / 100,
+        false,
+        paint..color = _mint,
+      );
+    }
+    Offset radial(double heading, double distance) =>
+        origin + Offset(math.cos(heading), math.sin(heading)) * distance;
+
+    final faceRadius = radius - 7;
+    canvas.drawCircle(
+      origin,
+      faceRadius,
+      paint
+        ..style = PaintingStyle.fill
+        ..color = const Color(0xFF39314E),
+    );
+    final accent = !enabled
+        ? _muted
+        : highlighted
+        ? _amber
+        : _ink;
+    canvas.drawCircle(
+      origin,
+      faceRadius,
+      paint
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = accent.withAlpha(130),
+    );
+    canvas.drawLine(
+      radial(angle, faceRadius * .36),
+      radial(angle, radius),
+      paint
+        ..strokeWidth = 3
+        ..color = accent,
+    );
+
+    if (band case final target? when enabled && highlighted) {
+      final direction = value < target.minimum ? -1.0 : 1.0;
+      final y = origin.dy + direction * (radius + 8);
+      final arrow = Path()
+        ..moveTo(origin.dx - 5, y - direction * 3)
+        ..lineTo(origin.dx, y + direction * 2)
+        ..lineTo(origin.dx + 5, y - direction * 3);
+      canvas.drawPath(
+        arrow,
+        paint
+          ..strokeWidth = 2
+          ..color = _mint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _VolumeDialPainter oldDelegate) =>
+      value != oldDelegate.value ||
+      band != oldDelegate.band ||
+      highlighted != oldDelegate.highlighted ||
+      enabled != oldDelegate.enabled;
 }
 
 class _VolumeCuePainter extends CustomPainter {
