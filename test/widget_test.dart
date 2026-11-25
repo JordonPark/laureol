@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laureol/festival_performance.dart';
 import 'package:laureol/festival_scene.dart';
 import 'package:laureol/festival_records.dart';
 import 'package:laureol/main.dart';
@@ -49,7 +50,7 @@ void main() {
 
       await tester.tap(find.text('공연 시작'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('두 줄이 함께 부르면 점수가 올라요'), findsOneWidget);
+      expect(find.textContaining('두 줄이 함께 부르면 콤보가 이어져요'), findsOneWidget);
       final start = find.text('동네 축제 시작');
       expect(start.hitTestable(), findsOneWidget);
       await tester.tap(start);
@@ -72,6 +73,17 @@ void main() {
       }
       expect(Scrollable.of(tester.element(cards.first)).position.pixels, 0);
       expect(find.byType(ZoneVolumeSlider).hitTestable(), findsNWidgets(2));
+
+      final stage = tester.widget<FestivalScene>(find.byType(FestivalScene));
+      await tester.pump(festivalTick * (272 - stage.tick));
+      expect(find.text('후렴 2 신호까지 16박'), findsOneWidget);
+      expect(find.byType(ZoneVolumeSlider).hitTestable(), findsNWidgets(2));
+      await tester.pump(const Duration(seconds: 4));
+      expect(
+        tester.widget<FestivalScene>(find.byType(FestivalScene)).tick,
+        368,
+      );
+      expect(find.text('후렴 2 신호까지 8박'), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 100));
       final results = find.text('결과 보기');

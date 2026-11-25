@@ -30,7 +30,7 @@ const _stage = 'docs/art/festival/stage.png';
 const _playGuide =
     '볼륨을 밀어 앞줄·뒷줄을 ✓ 준비에 맞춰요.\n'
     '노란 ‘라우럴!’ 버튼이 뜨면 준비된 한쪽을 눌러요.\n'
-    '두 줄이 함께 부르면 점수가 올라요.';
+    '두 줄이 함께 부르면 콤보가 이어져요.';
 
 Future<void> _open(
   BuildContext context,
@@ -275,7 +275,7 @@ class _SelectionScreenState extends State<_SelectionScreen> {
           '동네 축제',
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
         ),
-        const Text('약 100초 · 후렴 3개', style: TextStyle(color: _muted)),
+        const Text('약 85초 · 후렴 3개', style: TextStyle(color: _muted)),
         const Text(_playGuide, style: TextStyle(color: _paper, fontSize: 14)),
         _Action('동네 축제 시작', () => _play(), primary: true),
         if (best != null) ...[
@@ -349,6 +349,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
             ? _ResultsScreen(
                 records: widget.records,
                 score: _performance.score,
+                bestCombo: _performance.bestCombo,
                 results: [
                   for (var chorus = 1; chorus <= 3; chorus++)
                     _performance.chorusResult(chorus),
@@ -436,11 +437,18 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   void _startClock() {
     var previousTick = 0;
     _clock = Timer.periodic(festivalTick, (timer) {
-      setState(() => _performance.advanceTicks(timer.tick - previousTick));
+      late final bool skipped;
+      setState(() {
+        _performance.advanceTicks(timer.tick - previousTick);
+        skipped = _performance.advancePastInterlude();
+      });
       previousTick = timer.tick;
       if (_performance.finished) {
         _freezeScene();
         _savingResult = _saveResult();
+      } else if (skipped && _audio != null) {
+        _freezeScene();
+        _resumeScene();
       } else {
         _updateAudio();
       }
@@ -578,7 +586,16 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       remainingBeats: notice.$2,
       compact: compact,
     );
-    final beats = BeatStrip(remaining: performance.remainingBeats, total: 6);
+    final countdown = performance.nextSignalCountdown;
+    final beats = BeatStrip(
+      remaining: countdown?.remaining ?? performance.remainingBeats,
+      total: countdown?.total ?? 6,
+      label: countdown == null
+          ? null
+          : '후렴 ${countdown.chorus} 신호까지 ${countdown.remaining}박',
+      combo: performance.combo,
+      holdingCombo: performance.holdingCombo,
+    );
     final controls = LayoutBuilder(
       builder: (context, constraints) {
         final largeText = MediaQuery.textScalerOf(context).scale(14) > 20;
@@ -702,12 +719,14 @@ class _ResultsScreen extends StatelessWidget {
   const _ResultsScreen({
     required this.records,
     required this.score,
+    required this.bestCombo,
     required this.results,
     required this.saved,
   });
 
   final FestivalRecords records;
   final int score;
+  final int bestCombo;
   final List<ChorusResult> results;
   final bool saved;
 
@@ -718,6 +737,7 @@ class _ResultsScreen extends StatelessWidget {
       title: '전체 결과',
       children: [
         PerformanceScore(score: score),
+        Text('이번 공연 최고 콤보 $bestCombo박', style: const TextStyle(color: _muted)),
         if (!saved) const Text('최고 기록을 저장하지 못했어요.'),
         for (final result in results) ...[
           ChorusSummary(

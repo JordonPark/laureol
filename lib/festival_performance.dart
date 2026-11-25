@@ -3,6 +3,9 @@ import 'performance_controls.dart';
 const festivalTick = Duration(milliseconds: 125);
 const _ticksPerBeat = 4;
 const _ticksPerSecond = 8;
+const _interludeLength = 4 * _ticksPerSecond;
+const _joinGrace = 3 * _ticksPerSecond;
+const _frontProximityBoost = 14;
 const _generatorStopTick = 79 * _ticksPerSecond + _ticksPerBeat;
 
 enum FestivalZone { front, back }
@@ -143,6 +146,9 @@ class FestivalPerformance {
   int? _reservedTick;
   bool _signalSucceeded = false;
   int _leadBeats = 0;
+  int _combo = 0;
+  int _bestCombo = 0;
+  bool _joinedTogetherThisChorus = false;
   bool _transferReady = false;
   int? _waveTick;
   bool _waveTowardBack = true;
@@ -151,6 +157,13 @@ class FestivalPerformance {
   Duration get position => festivalTick * _tick;
   int get seconds => _tick ~/ _ticksPerSecond;
   int get score => _halfPoints.reduce((a, b) => a + b) ~/ 2;
+  int get combo => _combo;
+  int get bestCombo => _bestCombo;
+  bool get holdingCombo =>
+      _combo > 0 &&
+      !_joinedTogetherThisChorus &&
+      !finished &&
+      seconds < _choruses.last.end;
   List<int> get chorusScores =>
       _halfPoints.map((points) => points ~/ 2).toList(growable: false);
   ChorusResult chorusResult(int chorus) {
@@ -197,6 +210,45 @@ class FestivalPerformance {
       _tick >= chorus.opens * _ticksPerSecond &&
       _tick < chorus.closes * _ticksPerSecond;
 
+  ({_Chorus previous, _Chorus next})? get _interlude {
+    if (practiceChorus != null) return null;
+    for (var index = 1; index < _choruses.length; index++) {
+      final previous = _choruses[index - 1];
+      final next = _choruses[index];
+      if (seconds >= previous.end && seconds < next.opens) {
+        return (previous: previous, next: next);
+      }
+    }
+    return null;
+  }
+
+  ({int chorus, int remaining, int total})? get nextSignalCountdown {
+    final interlude = _interlude;
+    if (interlude == null) return null;
+    final cut = interlude.previous.end * _ticksPerSecond + _interludeLength;
+    final preview = interlude.next.preview * _ticksPerSecond;
+    final target = interlude.next.opens * _ticksPerSecond;
+    final skipped = preview - _tick.clamp(cut, preview);
+    return (
+      chorus: interlude.next.number,
+      remaining:
+          (target - _tick - skipped + _ticksPerBeat - 1) ~/ _ticksPerBeat,
+      total: (_interludeLength + target - preview) ~/ _ticksPerBeat,
+    );
+  }
+
+  /// After the sound check, jump to the next cue on the same musical beat.
+  /// Returns true if the music needs to seek to the new position.
+  bool advancePastInterlude() {
+    final interlude = _interlude;
+    if (interlude == null) return false;
+    final cut = interlude.previous.end * _ticksPerSecond + _interludeLength;
+    final preview = interlude.next.preview * _ticksPerSecond;
+    if (_tick < cut || _tick >= preview) return false;
+    advanceTicks(preview - cut);
+    return true;
+  }
+
   int get remainingBeats {
     final chorus = _chorusAt(_tick);
     if (chorus == null) return 0;
@@ -211,6 +263,7 @@ class FestivalPerformance {
   }
 
   (String, int?) get eventNotice {
+    if (finished) return ('공연 종료 · 결과를 확인해요', null);
     if (seconds < 14 && practiceChorus == null) {
       return status(FestivalZone.back) == CrowdStatus.ready
           ? ('리허설 · 노란 신호 버튼을 기다려요', null)
@@ -226,6 +279,10 @@ class FestivalPerformance {
       return (due.$1, (due.$2 - _tick + _ticksPerBeat - 1) ~/ _ticksPerBeat);
     }
     if (_tick >= _generatorEnd && seconds < 82) return ('발전기 정지 완료', null);
+    final interlude = _interlude;
+    if (interlude != null) {
+      return (_interludeNotice(interlude.previous, interlude.next), null);
+    }
     if (seconds >= 48 && seconds < 50) return ('앞줄 체감 볼륨 증가', null);
     final chorus = _chorusAt(_tick);
     if (signalQueued) return ('신호 예약 · 박자에 맞춰 떼창이 시작돼요', null);
@@ -233,7 +290,7 @@ class FestivalPerformance {
       return ('노란 ‘라우럴!’ 버튼을 준비된 쪽에서 눌러요', null);
     }
     if (chorus != null &&
-        _tick >= (chorus.start + 3) * _ticksPerSecond &&
+        _tick >= chorus.start * _ticksPerSecond + _joinGrace &&
         _tick < chorus.end * _ticksPerSecond &&
         !_signalSucceeded) {
       return ('볼륨을 ✓ 준비에 맞추면 떼창에 합류해요', null);
@@ -244,8 +301,39 @@ class FestivalPerformance {
         null,
       );
     }
-    return ('다음 신호 준비', null);
+    if (seconds >= _choruses.last.end) return ('마지막 후렴 종료 · 공연 마무리 중', null);
+    return holdingCombo ? ('두 줄을 다시 맞추면 콤보가 이어져요', null) : ('다음 신호 준비', null);
   }
+
+  String _interludeNotice(_Chorus previous, _Chorus next) {
+    if (seconds < previous.end + 2) {
+      final together = chorusResult(previous.number).togetherBeats;
+      return together == 0
+          ? '후렴 ${previous.number} 종료 · 다음은 두 줄을 맞춰요'
+          : '후렴 ${previous.number} · 함께 떼창 ${(together / 2).toStringAsFixed(1)}초';
+    }
+    final front = _levelFor(FestivalZone.front.index, _frontProximityBoost);
+    if (next.number == 2) {
+      final approach = seconds < 48 ? '앞줄 접근 대비' : '앞줄 접근';
+      return switch (front) {
+        CrowdStatus.quiet => '$approach · 앞줄 볼륨을 올려요',
+        CrowdStatus.loud => '$approach · 앞줄 볼륨을 내려요',
+        _ => _rearStatusHint ?? '다음 후렴 두 줄 ✓ 준비 · 볼륨을 유지해요',
+      };
+    }
+    if (front != CrowdStatus.ready) {
+      return front == CrowdStatus.quiet
+          ? '발전기 대비 · 앞줄 볼륨을 올려요'
+          : '발전기 대비 · 앞줄 볼륨을 내려요';
+    }
+    return _rearStatusHint ?? '두 줄 ✓ 준비 · 발전기가 켜지면 뒷줄을 살펴요';
+  }
+
+  String? get _rearStatusHint => switch (_levels[FestivalZone.back.index]) {
+    CrowdStatus.quiet => '뒷줄 볼륨을 올려 ✓ 준비에 맞춰요',
+    CrowdStatus.loud => '뒷줄 볼륨을 내려 ✓ 준비에 맞춰요',
+    _ => null,
+  };
 
   int volume(FestivalZone zone) => _volumes[zone.index];
   CrowdStatus status(FestivalZone zone) {
@@ -340,29 +428,40 @@ class FestivalPerformance {
       return;
     }
     final index = chorus.number - 1;
+    final together = _singing[0] && _singing[1];
     _chorusBeats[index].add((_singing[0] ? 1 : 0) | (_singing[1] ? 2 : 0));
     _halfPoints[index] +=
-        (_singing[0] ? 1 : 0) +
-        (_singing[1] ? 1 : 0) +
-        (_singing.every((value) => value) ? 1 : 0);
+        (_singing[0] ? 1 : 0) + (_singing[1] ? 1 : 0) + (together ? 1 : 0);
+    if (together) {
+      _joinedTogetherThisChorus = true;
+      _combo++;
+      if (_combo > _bestCombo) _bestCombo = _combo;
+    } else if (_joinedTogetherThisChorus ||
+        beatStart >= chorus.start * _ticksPerSecond + _joinGrace) {
+      _combo = 0;
+    }
   }
 
   void _refreshLevels() {
     for (var i = 0; i < 2; i++) {
       final modifier = i == 0
-          ? (seconds >= 48 ? 14 : 0)
+          ? (seconds >= 48 ? _frontProximityBoost : 0)
           : (generatorRunning ? -16 : 0);
-      final heard = (_volumes[i] + _volumes[1 - i] / 5 + modifier).clamp(
-        0,
-        100,
-      );
-      final margin = _levels[i] == CrowdStatus.ready ? 2 : 0;
-      _levels[i] = heard < 56 - margin
-          ? CrowdStatus.quiet
-          : heard > 68 + margin
-          ? CrowdStatus.loud
-          : CrowdStatus.ready;
+      _levels[i] = _levelFor(i, modifier);
     }
+  }
+
+  CrowdStatus _levelFor(int index, int modifier) {
+    final heard = (_volumes[index] + _volumes[1 - index] / 5 + modifier).clamp(
+      0,
+      100,
+    );
+    final margin = _levels[index] == CrowdStatus.ready ? 2 : 0;
+    return heard < 56 - margin
+        ? CrowdStatus.quiet
+        : heard > 68 + margin
+        ? CrowdStatus.loud
+        : CrowdStatus.ready;
   }
 
   void _resetChorus() {
@@ -371,6 +470,7 @@ class FestivalPerformance {
     _reservedTick = null;
     _signalSucceeded = false;
     _leadBeats = 0;
+    _joinedTogetherThisChorus = false;
     _transferReady = false;
     _waveTick = null;
   }
@@ -393,7 +493,7 @@ class FestivalPerformance {
           _levels[other] == CrowdStatus.ready &&
           (_singing[other] || (_transferReady && leadReady));
       _singing[lead] = leadReady;
-    } else if (_tick >= (chorus.start + 3) * _ticksPerSecond) {
+    } else if (_tick >= chorus.start * _ticksPerSecond + _joinGrace) {
       for (var i = 0; i < 2; i++) {
         _singing[i] = _levels[i] == CrowdStatus.ready;
       }

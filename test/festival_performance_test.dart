@@ -35,6 +35,86 @@ void main() {
     expect(performance.chorusScores, [28, 0, 0]);
   });
 
+  test('Interludes turn the previous chorus into the next sound check', () {
+    final performance = FestivalPerformance();
+    const front = FestivalZone.front;
+    const back = FestivalZone.back;
+    _at(performance, 22);
+    performance.setVolume(back, 50);
+    performance.queue(front);
+    _at(performance, 34);
+    expect(performance.chorusScores, [28, 0, 0]);
+    expect(performance.eventNotice, ('후렴 1 · 함께 떼창 9.0초', null));
+    expect(performance.nextSignalCountdown, (
+      chorus: 2,
+      remaining: 16,
+      total: 16,
+    ));
+    expect(performance.combo, 18);
+    expect(performance.holdingCombo, isTrue);
+
+    _at(performance, 36);
+    expect(performance.eventNotice.$1, contains('앞줄 볼륨을 내려요'));
+    performance.setVolume(front, 40);
+    expect(performance.eventNotice.$1, contains('두 줄 ✓ 준비'));
+    expect(performance.status(front), CrowdStatus.quiet);
+    expect(performance.advancePastInterlude(), isFalse);
+    _at(performance, 38);
+    expect(performance.nextSignalCountdown?.remaining, 8);
+    expect(performance.advancePastInterlude(), isTrue);
+    expect(performance.position, const Duration(seconds: 46));
+    expect(performance.combo, 18);
+    expect(performance.advancePastInterlude(), isFalse);
+    expect(performance.eventNotice, ('앞줄 관객 접근', 4));
+    expect(performance.nextSignalCountdown?.remaining, 8);
+    _at(performance, 48);
+    expect(performance.status(front), CrowdStatus.ready);
+    expect(performance.volume(front), 40);
+    _at(performance, 50);
+    expect(performance.nextSignalCountdown, isNull);
+    expect(performance.signal(back), SignalState.available);
+    expect(performance.chorusScores, [28, 0, 0]);
+
+    performance.queue(back);
+    _at(performance, 53);
+    expect(performance.combo, 18);
+    _at(performance, 53.5);
+    expect(performance.combo, 19);
+    expect(performance.holdingCombo, isFalse);
+    _at(performance, 62);
+    expect(performance.eventNotice.$1, startsWith('후렴 2 · 함께 떼창'));
+    expect(performance.nextSignalCountdown, (
+      chorus: 3,
+      remaining: 16,
+      total: 16,
+    ));
+    expect(performance.combo, 36);
+    _at(performance, 64);
+    expect(performance.eventNotice.$1, contains('발전기가 켜지면 뒷줄'));
+    _at(performance, 66);
+    expect(performance.advancePastInterlude(), isTrue);
+    expect(performance.position, const Duration(seconds: 74));
+    expect(performance.eventNotice, ('발전기 가동', 4));
+    expect(performance.nextSignalCountdown?.remaining, 8);
+    _at(performance, 78);
+    expect(performance.nextSignalCountdown, isNull);
+    expect(performance.signal(front), SignalState.available);
+  });
+
+  test('A missed beat ends the combo after the next chorus grace period', () {
+    final performance = FestivalPerformance();
+    _at(performance, 22);
+    performance.setVolume(FestivalZone.back, 50);
+    performance.queue(FestivalZone.front);
+    _at(performance, 34);
+    performance.setVolume(FestivalZone.back, 0);
+    _at(performance, 55);
+    expect(performance.combo, 18);
+    _at(performance, 55.5);
+    expect(performance.combo, 0);
+    expect(performance.bestCombo, 18);
+  });
+
   test('Generator follows the timeline even without a queued signal', () {
     final performance = FestivalPerformance(practiceChorus: 3);
     expect(performance.eventNotice, ('발전기 가동', 4));

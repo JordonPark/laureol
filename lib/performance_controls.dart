@@ -201,30 +201,63 @@ class SignalButton extends StatelessWidget {
 }
 
 class BeatStrip extends StatelessWidget {
-  const BeatStrip({super.key, required this.remaining, this.total = 4})
-    : assert(total > 0 && remaining >= 0 && remaining <= total);
+  const BeatStrip({
+    super.key,
+    required this.remaining,
+    this.total = 4,
+    this.label,
+    this.combo = 0,
+    this.holdingCombo = false,
+  }) : assert(total > 0 && remaining >= 0 && remaining <= total);
 
   final int remaining;
   final int total;
+  final String? label;
+  final int combo;
+  final bool holdingCombo;
 
   @override
   Widget build(BuildContext context) {
+    final text = label ?? '남은 박 $remaining';
+    final segments = total > 6 ? 6 : total;
+    final comboText = '$combo 콤보${holdingCombo ? ' 유지' : ''}';
     return Semantics(
-      label: '남은 박 $remaining',
+      label: combo == 0 ? text : '$text, $comboText',
       excludeSemantics: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('남은 박 $remaining', style: const TextStyle(color: _ink)),
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 6,
+              runSpacing: 2,
+              children: [
+                Text(text, style: const TextStyle(color: _ink)),
+                if (combo > 0)
+                  Text(
+                    comboText,
+                    style: const TextStyle(
+                      color: _mint,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 6),
           Row(
             children: List.generate(
-              total,
+              segments,
               (index) => Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: ColoredBox(
-                    color: index < remaining ? _amber : _line,
+                    color: index * total < remaining * segments
+                        ? _amber
+                        : _line,
                     child: const SizedBox(height: 5),
                   ),
                 ),
