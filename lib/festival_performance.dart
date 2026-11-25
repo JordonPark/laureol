@@ -440,7 +440,12 @@ class FestivalPerformance {
           (_generatorEnd - _tick + _ticksPerBeat - 1) ~/ _ticksPerBeat,
         );
       }
-      return ('발전기 정지 · 준비된 뒷줄에서 두 줄 동시 시작', null);
+      return (
+        startsBothRows(FestivalZone.back)
+            ? '발전기 정지 · 두 줄 동시 시작 가능'
+            : '발전기 정지 · 민트색 구간에 볼륨을 맞춰요',
+        null,
+      );
     }
     if (due != null && _tick < due.$2) {
       return (due.$1, (due.$2 - _tick + _ticksPerBeat - 1) ~/ _ticksPerBeat);
@@ -463,7 +468,12 @@ class FestivalPerformance {
     }
     if (signalQueued) return ('신호 예약 · 박자에 맞춰 떼창이 시작돼요', null);
     if (chorus != null && _reserved == null && _isOpen(chorus)) {
-      return ('노란 ‘라우럴!’ 버튼을 준비된 쪽에서 눌러요', null);
+      return (
+        recommendedSignalZone == null
+            ? '민트색 구간에 볼륨을 맞춰요'
+            : '노란 ‘라우럴!’ 버튼으로 신호를 보내요',
+        null,
+      );
     }
     if (chorus != null &&
         _tick >= chorus.start * _ticksPerSecond + _joinGrace &&

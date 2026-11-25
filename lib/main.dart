@@ -31,7 +31,7 @@ const _uiFont = 'Laureol Sans';
 const _titleArt = 'docs/art/festival/title-festival.png';
 const _playGuide =
     '볼륨을 밀어 앞줄·뒷줄을 ✓ 준비에 맞춰요.\n'
-    '노란 ‘라우럴!’ 버튼이 뜨면 준비된 한쪽을 눌러요.\n'
+    '노란 ‘라우럴!’ 버튼이 켜지면 신호를 보내요.\n'
     '두 줄이 함께 부르면 콤보가 이어져요.';
 
 Future<void> _open(
