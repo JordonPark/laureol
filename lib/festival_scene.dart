@@ -152,6 +152,10 @@ class FestivalScene extends StatefulWidget {
     this.focusedZone,
     this.focusedVolume,
     this.onZoneSelected,
+    this.venue = FestivalVenue.neighborhood,
+    this.lightingTier = 0,
+    this.readyPulse = 0,
+    this.readyZones = 0,
   });
 
   final int tick;
@@ -165,6 +169,10 @@ class FestivalScene extends StatefulWidget {
   final FestivalZone? focusedZone;
   final int? focusedVolume;
   final ValueChanged<FestivalZone>? onZoneSelected;
+  final FestivalVenue venue;
+  final int lightingTier;
+  final int readyPulse;
+  final int readyZones;
 
   @override
   State<FestivalScene> createState() => _FestivalSceneState();
@@ -226,7 +234,7 @@ class _FestivalSceneState extends State<FestivalScene> {
   @override
   Widget build(BuildContext context) {
     final description =
-        '동네 축제. 앞줄 ${widget.front.label}, '
+        '${widget.venue.title}. 앞줄 ${widget.front.label}, '
         '뒷줄 ${widget.back.label}. '
         '발전기 ${widget.generatorRunning ? '작동 중' : '정지'}.';
     return Semantics(
@@ -242,20 +250,33 @@ class _FestivalSceneState extends State<FestivalScene> {
               : Stack(
                   fit: StackFit.expand,
                   children: [
-                    CustomPaint(
-                      painter: _FestivalPainter(
-                        images: _images,
-                        tick: widget.tick,
-                        front: widget.front,
-                        back: widget.back,
-                        generatorRunning: widget.generatorRunning,
-                        signalQueued: widget.signalQueued,
-                        waveFrame: widget.waveFrame,
-                        waveTowardBack: widget.waveTowardBack,
-                        compact: widget.compact,
-                        focusedZone: widget.focusedZone,
-                        focusedVolume: widget.focusedVolume,
-                        canSelectAudience: widget.onZoneSelected != null,
+                    TweenAnimationBuilder<double>(
+                      key: ValueKey(widget.readyPulse),
+                      tween: Tween(begin: 0, end: 1),
+                      duration:
+                          widget.readyZones == 0 ||
+                              MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 480),
+                      builder: (context, progress, _) => CustomPaint(
+                        painter: _FestivalPainter(
+                          images: _images,
+                          tick: widget.tick,
+                          front: widget.front,
+                          back: widget.back,
+                          generatorRunning: widget.generatorRunning,
+                          signalQueued: widget.signalQueued,
+                          waveFrame: widget.waveFrame,
+                          waveTowardBack: widget.waveTowardBack,
+                          compact: widget.compact,
+                          focusedZone: widget.focusedZone,
+                          focusedVolume: widget.focusedVolume,
+                          canSelectAudience: widget.onZoneSelected != null,
+                          venue: widget.venue,
+                          lightingTier: widget.lightingTier,
+                          readyZones: widget.readyZones,
+                          pulseProgress: progress,
+                        ),
                       ),
                     ),
                     if (widget.onZoneSelected != null)
@@ -311,6 +332,10 @@ class _FestivalPainter extends CustomPainter {
     required this.focusedZone,
     required this.focusedVolume,
     required this.canSelectAudience,
+    required this.venue,
+    required this.lightingTier,
+    required this.readyZones,
+    required this.pulseProgress,
   }) : images = Map.of(images);
 
   final Map<_Sprite, ui.Image> images;
@@ -325,6 +350,10 @@ class _FestivalPainter extends CustomPainter {
   final FestivalZone? focusedZone;
   final int? focusedVolume;
   final bool canSelectAudience;
+  final FestivalVenue venue;
+  final int lightingTier;
+  final int readyZones;
+  final double pulseProgress;
 
   final _nearest = Paint()..filterQuality = FilterQuality.none;
 
@@ -496,6 +525,58 @@ class _FestivalPainter extends CustomPainter {
     );
   }
 
+  void _drawReadyPulse(Canvas canvas) {
+    if (readyZones == 0 || pulseProgress >= 1) return;
+    final fade = (210 * (1 - pulseProgress)).round();
+    final radius = 34 + pulseProgress * 94;
+    final paint = Paint()
+      ..color = const Color(0xFF7CE0C2).withAlpha(fade)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    for (final zone in FestivalZone.values) {
+      if (readyZones & (1 << zone.index) == 0) continue;
+      final y = _y(zone == FestivalZone.front ? 215 : 281);
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(155, y),
+          width: radius * 2,
+          height: radius * .50,
+        ),
+        paint,
+      );
+    }
+  }
+
+  void _drawStageLights(Canvas canvas) {
+    if (lightingTier == 0 && venue != FestivalVenue.nightMarket) return;
+    const colors = [Color(0xFF7CE0C2), Color(0xFFFFC46A), Color(0xFFFF9EDA)];
+    for (
+      var i = 0;
+      i < lightingTier + (venue == FestivalVenue.nightMarket ? 1 : 0);
+      i++
+    ) {
+      final x = 78.0 + i * 55;
+      final color = colors[i % colors.length];
+      final beam = Path()
+        ..moveTo(x, _y(89))
+        ..lineTo(x - 52, _y(177))
+        ..lineTo(x + 64, _y(177))
+        ..close();
+      canvas.drawPath(
+        beam,
+        Paint()
+          ..shader = ui.Gradient.linear(Offset(x, _y(89)), Offset(x, _y(177)), [
+            color.withAlpha(158),
+            color.withAlpha(35),
+          ]),
+      );
+      canvas.drawRect(
+        Rect.fromLTWH(x - 3, _y(90), 6, 5),
+        Paint()..color = color,
+      );
+    }
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
@@ -508,7 +589,9 @@ class _FestivalPainter extends CustomPainter {
         ..shader = ui.Gradient.linear(
           const Offset(0, 0),
           Offset(0, height),
-          const [Color(0xFF3D2F53), Color(0xFF211E34)],
+          venue == FestivalVenue.nightMarket
+              ? const [Color(0xFF1C3E54), Color(0xFF182633)]
+              : const [Color(0xFF3D2F53), Color(0xFF211E34)],
         ),
     );
     _draw(canvas, _Sprite.ground, const Offset(176, 327), 149);
@@ -517,6 +600,7 @@ class _FestivalPainter extends CustomPainter {
     _draw(canvas, _Sprite.backdrop, const Offset(292, 123), 58, mirror: true);
     _draw(canvas, _Sprite.lighting, const Offset(39, 154), 103);
     _draw(canvas, _Sprite.stage, const Offset(167, 178), 170);
+    _drawStageLights(canvas);
     _draw(canvas, _Sprite.speaker, const Offset(61, 170), 61);
     _draw(canvas, _Sprite.speaker, const Offset(267, 166), 55, mirror: true);
     _draw(
@@ -597,6 +681,7 @@ class _FestivalPainter extends CustomPainter {
     );
     final focusPercent = focusedVolume == null ? '' : ' $focusedVolume%';
     final choose = canSelectAudience ? ' ›' : '';
+    _drawReadyPulse(canvas);
     final frontFocused = focusedZone == FestivalZone.front;
     final backFocused = focusedZone == FestivalZone.back;
     _zoneLabel(
@@ -628,6 +713,10 @@ class _FestivalPainter extends CustomPainter {
       focusedZone != oldDelegate.focusedZone ||
       focusedVolume != oldDelegate.focusedVolume ||
       canSelectAudience != oldDelegate.canSelectAudience ||
+      lightingTier != oldDelegate.lightingTier ||
+      readyZones != oldDelegate.readyZones ||
+      pulseProgress != oldDelegate.pulseProgress ||
+      venue != oldDelegate.venue ||
       compact != oldDelegate.compact ||
       images.length != oldDelegate.images.length;
 }

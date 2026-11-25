@@ -5,6 +5,31 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test(
+    'Completing the audience goal unlocks a separate night market record',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final records = FestivalRecords(preferences);
+      expect(records.nightMarketUnlocked, isFalse);
+      final first = FestivalPerformance()..advanceTicks(22 * 8);
+      first.setVolume(FestivalZone.back, 50);
+      first.queue(FestivalZone.front);
+      first.advanceTicks(100 * 8 - first.tick);
+      expect(first.missionAchieved, isTrue);
+      expect(await records.record(first), isTrue);
+      await preferences.reload();
+      expect(FestivalRecords(preferences).nightMarketUnlocked, isTrue);
+
+      final market = FestivalPerformance(venue: FestivalVenue.nightMarket)
+        ..advanceTicks(24 * 8);
+      expect(market.eventNotice.$1, contains('야시장 소음'));
+      market.advanceTicks(100 * 8 - market.tick);
+      expect(await records.record(market), isTrue);
+      expect(records.bestFor(FestivalVenue.nightMarket)?.score, market.score);
+      expect(records.concertBest?.score, first.score);
+    },
+  );
+  test(
     'Restores both sliders from the chosen chorus and preserves the log',
     () {
       final performance = FestivalPerformance();

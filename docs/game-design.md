@@ -379,6 +379,17 @@
 
 </details>
 
+### 최신 구현의 종합 재평가
+
+| 항목 | 잠정 점수 | 이번 평가 근거 |
+|---|---:|---|
+| 핵심 재미 | 90/100 | 객석 파동, 콤보 복구, 실패 직전 연습이 한 공연 안에서 이어져요. 첫 플레이에서 복구를 스스로 시도하고 다시 플레이하는지는 실기 검수가 남았어요. |
+| 레벨 디자인 | 92/100 | 일반·숙련·야시장에 다른 사건 배치를 적용했어요. 두 무대가 같은 곡과 기본 조작을 공유해서 진행할수록 선택이 실제로 달라지는지 확인해야 해요. |
+| 밸런스 | 91/100 | 발전기 정지 시각에 따라 앞줄 즉시 시작과 기다리기의 우위가 바뀌는 걸 규칙 테스트로 확인했어요. 초보자와 숙련자의 성공률, 점수 분포는 검수가 남았어요. |
+| UX/UI | 94/100 | 무대별 목표와 기록, 시작 행동을 한 카드에 모았어요. iPhone 크기의 세로·가로 위젯 테스트에서 공연 종료 후 자동 전환을 확인했어요. 처음 보는 사용자가 무음으로 신호 버튼과 판정을 이해하는지 확인해야 해요. |
+| 시각 디자인 | 96/100 | Android 에뮬레이터에서 두 무대 원화와 잠금 상태를 한 화면에서 확인했어요. iPhone 실기에서 작은 화면의 조작 반응과 콤보 조명이 읽히는지 검수가 남았어요. |
+| **동일 가중치 평균** | **92.6/100** | 현재 구현의 잠정 평가는 반올림해 **93점**이에요. |
+
 ### 20.1 공연 타임라인
 
 테스트 곡은 **120 BPM, 4/4박자**로 잡아요. 시작 시각을 0초로 계산하며 한 박은 0.5초예요. 아래 시간은 테스트 곡의 기준이고, 최종 음악을 사용할 때는 같은 사건 순서를 유지하며 마디 위치를 맞춰요.
@@ -702,7 +713,7 @@
 | 사건·박자 | 60px 안팎 | 사건 문구와 남은 박을 한 영역에서 보여줘요. 사건 문구 없이도 같은 공간을 유지해 카드가 움직이지 않게 해요. |
 | 조작 카드 | 176px 안팎 | 두 카드를 나란히 두고 구역 이름, 상태, 슬라이더, 신호 버튼 순서를 맞춰요. 슬라이더와 버튼은 각각 48px 이상의 터치 높이를 확보해요. |
 
-영역 사이와 바깥 여백은 합계 약 24px를 초기값으로 잡아요. 시스템 안전 영역을 제외한 높이에 맞춰 객석의 여백부터 조정해요. 시스템 글자 크기 1.8배나 더 좁은 안전 영역에서는 카드를 세로로 쌓고 스크롤을 허용해 조작 크기와 안내 문구를 유지해요. 결과 보기 버튼이 생기더라도 공연 도중의 카드 위치에는 영향을 주지 않게 배치해요.
+영역 사이와 바깥 여백은 합계 약 24px를 초기값으로 잡아요. 시스템 안전 영역을 제외한 높이에 맞춰 객석의 여백부터 조정해요. 시스템 글자 크기 1.8배나 더 좁은 안전 영역에서는 카드를 세로로 쌓고 스크롤을 허용해 조작 크기와 안내 문구를 유지해요. 공연이 끝나면 결과 화면으로 자동 전환해요.
 
 **완료 기준** — 기본 글자 크기에서 리허설·앞줄 신호 예약·양쪽 떼창을 각각 열어 양쪽 대표 관객과 두 카드가 한 화면에 있는지 확인해요. 스크롤 없이 뒷줄 볼륨을 바꾸고 앞줄 신호를 보낼 수 있어야 해요. 사건 문구나 신호가 바뀌어도 터치할 곳이 이동하지 않아야 해요.
 
@@ -802,3 +813,46 @@
 별도 Android 15 에뮬레이터에 오디오 빌드를 설치해 재생 → 일시정지 → 이어 하기에서 시스템 오디오 트랙이 켜짐 → 멈춤 → 켜짐으로 바뀌는 걸 확인했어요. 마지막 후렴의 숙련 도전을 열었을 때 발전기 예고가 나오는 74초 구간으로 복원되고 오디오 트랙이 다시 재생됐어요. 원음 파형과 화면의 지연을 실기기에서 계측하는 검증은 남아 있어요.
 
 **시각 디자인 재평가** — 기존 96점에서 애니메이션 항목을 18점에서 19점으로 올려 **97/100점**으로 평가해요. 이번 점수는 Android 320×640 에뮬레이터에서 확인한 시각 기준이에요. iOS 실기기와 다양한 화면 크기에서의 최종 검수는 별도예요.
+
+## 40. 재미 목표 97점과 적용 순서
+
+실기 피드백을 반영한 잠정 재미점수는 **84/100점**이에요. 첫 조작의 뜻과 관객 반응이 읽히는지부터 확인하고, 같은 조작으로 다른 선택을 만들 수 있도록 공연을 확장해요.
+
+| 순서 | 적용 내용 | 완료 기준 |
+|---|---|---|
+| 1 | 볼륨을 맞춘 구역에 즉시 파동을 보여줘요. | 무음으로 슬라이더를 움직여 앞줄과 뒷줄 중 어느 쪽이 준비됐는지 바로 확인해요. |
+| 2 | 콤보에서 이탈한 구역을 표시하고 후렴마다 한 번, 두 박 안에 복구할 기회를 줘요. | 복구하면 기존 콤보가 이어지고, 늦거나 한 번 더 놓치면 끊겨요. 놓친 박에는 점수를 주지 않아요. |
+| 3 | 10·25·40콤보에서 무대 조명이 달라져요. | 작은 화면에서 다음 조작이 계속 보이고, 동작 줄이기에서는 점멸 없이 단계가 바뀌어요. |
+| 4 | 마지막 후렴에서 앞줄 즉시 시작과 발전기 정지 후 뒷줄 동시 합류를 비교해요. | 발전기가 일찍 멈추면 기다리기가, 늦게 멈추면 일찍 시작하기가 유리한 기준 플레이를 각각 재현해요. |
+| 5 | 결과에서 끊긴 콤보의 구역과 박을 보여주고 3초 앞으로 되돌려요. | 당시 볼륨과 신호 상태에서 연습을 시작해요. 연습 결과는 본 공연 점수에 합산하지 않아요. |
+| 6 | 동네 축제 목표를 달성하면 야외 야시장이 열려요. | 앱을 다시 열어도 해금이 남아요. 야시장은 첫 후렴 뒷줄 소음과 늦게 꺼지는 발전기에 대응해야 해요. |
+
+| 재미 항목 | 목표 점수 | 실기에서 확인할 행동 |
+|---|---:|---|
+| 첫인상과 콘셉트 | 19/20 | 처음 보는 플레이어가 5초 안에 첫 볼륨을 움직여요. |
+| 조작과 반응 | 20/20 | 별도 설명 없이 무음으로 영향을 받은 객석을 찾아요. |
+| 판단의 깊이 | 19/20 | 두 시작 전략을 모두 시도하고 자신이 고른 이유를 말해요. |
+| 공연의 리듬 | 20/20 | 후렴 사이에 다음 조작을 준비하고, 복구 입력으로 흐름을 이어가요. |
+| 다시 할 이유 | 19/20 | 놓친 박을 다시 열거나 목표 달성 후 야시장을 자발적으로 시작해요. |
+| **합계** | **97/100** | iPhone과 Android 실기 첫 플레이 결과를 기록한 뒤 다시 평가해요. |
+
+### 공연 선택과 결과 흐름
+
+공연 선택에서는 동네 축제와 야외 야시장을 각각 별도 카드로 보여줘요. 무대 이름과 최고 기록은 원화 위에 표시하고 그 아래에 목표와 시작 버튼을 배치해요. 잠긴 야시장에서도 무대와 해금 조건을 확인할 수 있어요. 조작 연습과 숙련 후렴은 카드 아래에서 따로 열어요.
+
+마지막 박을 처리하고 기록 저장을 시도한 뒤, 입력 없이 해당 결과 화면으로 바로 전환해요. 전체 공연, 후렴 연습, 콤보 복구 연습에 같은 흐름을 적용해요. 저장이 실패하면 결과를 보여주고 화면에 저장 상태를 알려줘요.
+
+[동네 축제 원화](art/festival/venue-neighborhood.png) · [야외 야시장 원화](art/festival/venue-market.png)
+
+<details>
+<summary>무대 카드 원화 생성 프롬프트</summary>
+
+**동네 축제**
+
+> Original Korean indie game venue card art, landscape 3:2. True 2.5D 16-bit pixel art with deliberate hard square pixels, crisp silhouettes, rich pixel clusters, no smooth photographic textures. A wide clear concert composition, stage and crowd readable at phone thumbnail size. Colorful but controlled contrast, high polish. Only the environment illustration, no text, UI, frame, border, graphics labels, watermarks or lettering. A late-summer Korean neighborhood square at twilight, viewed from an elevated diagonal angle just beyond the front crowd. Temporary blue canopy stage with amber string lights and triangular flags, singer and guitarist, two black speaker stacks, a small group clapping in the foreground. Peach and amber stage lights against violet blue houses, with a strong focal stage on the middle-right and dark-safe lower corners. Composition separate from a vertical title image, built for a landscape venue card.
+
+**야외 야시장**
+
+> Original Korean indie game venue card art, landscape 3:2. True 2.5D 16-bit pixel art with deliberate hard square pixels, crisp silhouettes, rich pixel clusters, no smooth photographic textures. A wide clear concert composition, stage and crowd readable at phone thumbnail size. Colorful but controlled contrast, high polish. Only the environment illustration, no text, UI, frame, border, graphics labels, watermarks or lettering. A busy Korean outdoor night market turned into a small live gig after dark, viewed from an elevated diagonal angle. Teal carts, coral lanterns, a small improvised performance stage with warm stage lighting, a food truck and compact portable generator visible near the rear crowd. Night navy, jade and coral make it distinct from an amber neighborhood festival. Keep the crowd and the scene readable, with dark-safe lower corners and dramatic warm-versus-cool lighting.
+
+</details>

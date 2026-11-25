@@ -13,6 +13,7 @@ import 'festival_performance.dart';
 import 'festival_records.dart';
 import 'festival_scene.dart';
 import 'performance_controls.dart';
+import 'venue_card.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -100,7 +101,6 @@ class _Screen extends StatelessWidget {
     this.middle,
     this.compact = false,
     this.maxWidth = 520,
-    this.footer,
   });
 
   final String title;
@@ -109,7 +109,6 @@ class _Screen extends StatelessWidget {
   final Widget? middle;
   final bool compact;
   final double maxWidth;
-  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -140,23 +139,7 @@ class _Screen extends StatelessWidget {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
-            child: footer == null
-                ? content
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(child: content),
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          horizontal,
-                          4,
-                          horizontal,
-                          8,
-                        ),
-                        child: footer!,
-                      ),
-                    ],
-                  ),
+            child: content,
           ),
         ),
       ),
@@ -181,27 +164,6 @@ class _Action extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
       onPressed: onPressed,
       child: Text(label, textAlign: TextAlign.center),
-    );
-  }
-}
-
-class _StageArt extends StatelessWidget {
-  const _StageArt({required this.height});
-
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: Image.asset(
-        _titleArt,
-        width: double.infinity,
-        height: math.min(height, MediaQuery.sizeOf(context).height * .25),
-        fit: BoxFit.cover,
-        alignment: const Alignment(0, .12),
-        excludeFromSemantics: true,
-      ),
     );
   }
 }
@@ -412,6 +374,7 @@ class _SelectionScreenState extends State<_SelectionScreen> {
   Future<void> _play({
     ChorusCheckpoint? checkpoint,
     bool rehearse = false,
+    FestivalVenue venue = FestivalVenue.neighborhood,
   }) async {
     await _open(
       context,
@@ -419,6 +382,7 @@ class _SelectionScreenState extends State<_SelectionScreen> {
         records: widget.records,
         checkpoint: checkpoint,
         rehearse: rehearse,
+        venue: venue,
         mastery: checkpoint != null,
         previousScore: checkpoint == null ? null : widget.records.masteryBest,
       ),
@@ -428,26 +392,111 @@ class _SelectionScreenState extends State<_SelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final safeWidth = MediaQuery.paddingOf(context).deflateSize(size).width;
+    final sideBySide = safeWidth >= 620 && size.width > size.height;
+    final compact = size.height < 480;
     final best = widget.records.concertBest;
     final masteryBest = widget.records.masteryBest;
+    final neighborhood = VenueCard(
+      venue: FestivalVenue.neighborhood,
+      artHeight: compact ? 144 : 190,
+      best: best?.score,
+      onPlay: () => _play(),
+    );
+    final market = VenueCard(
+      venue: FestivalVenue.nightMarket,
+      artHeight: compact ? 144 : 158,
+      best: widget.records.bestFor(FestivalVenue.nightMarket)?.score,
+      onPlay: widget.records.nightMarketUnlocked
+          ? () => _play(venue: FestivalVenue.nightMarket)
+          : null,
+    );
     return _Screen(
       title: '공연 선택',
-      compact: MediaQuery.sizeOf(context).height < 480,
+      compact: compact,
+      maxWidth: sideBySide ? 900 : 520,
       children: [
-        const _StageArt(height: 200),
-        const Text(
-          '동네 축제',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-        ),
-        const Text('후렴 3개', style: TextStyle(color: _muted)),
-        _Action('동네 축제 시작', () => _play(), primary: true),
-        _Action('조작 다시 연습', () => _play(rehearse: true)),
-        if (best != null) ...[
-          Text('일반 공연 최고 기록 ${best.score}/90'),
-          if (masteryBest != null) Text('숙련 후렴 최고 기록 $masteryBest/30'),
-          _Action('숙련 후렴 도전', () => _play(checkpoint: best.checkpoint)),
+        if (sideBySide)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: neighborhood),
+              const SizedBox(width: 12),
+              Expanded(child: market),
+            ],
+          )
+        else ...[
+          neighborhood,
+          market,
         ],
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          alignment: WrapAlignment.center,
+          children: [
+            _SelectionShortcut(
+              icon: CupertinoIcons.slider_horizontal_3,
+              label: '조작 다시 연습',
+              onPressed: () => _play(rehearse: true),
+            ),
+            if (best != null)
+              _SelectionShortcut(
+                icon: CupertinoIcons.bolt_fill,
+                label: '숙련 후렴 도전',
+                detail: masteryBest == null ? null : '최고 $masteryBest/30',
+                onPressed: () => _play(checkpoint: best.checkpoint),
+              ),
+          ],
+        ),
       ],
+    );
+  }
+}
+
+class _SelectionShortcut extends StatelessWidget {
+  const _SelectionShortcut({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.detail,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  final String? detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoButton(
+      color: const Color(0xFF252037),
+      foregroundColor: _paper,
+      minimumSize: const Size(48, 48),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      borderRadius: BorderRadius.circular(8),
+      onPressed: onPressed,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: _gold, size: 15),
+          const SizedBox(width: 7),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 13)),
+                if (detail case final record?)
+                  Text(
+                    record,
+                    style: const TextStyle(color: _muted, fontSize: 11),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -461,6 +510,8 @@ class _PerformanceScreen extends StatefulWidget {
     this.mastery = false,
     this.rehearse = false,
     this.returnHome = false,
+    this.venue = FestivalVenue.neighborhood,
+    this.recovery,
   });
 
   final FestivalRecords records;
@@ -470,6 +521,8 @@ class _PerformanceScreen extends StatefulWidget {
   final bool mastery;
   final bool rehearse;
   final bool returnHome;
+  final FestivalVenue venue;
+  final ComboBreak? recovery;
 
   @override
   State<_PerformanceScreen> createState() => _PerformanceScreenState();
@@ -488,9 +541,10 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   bool _starting = false;
   bool _pauseOpen = false;
   bool _openingResults = false;
-  Future<bool>? _savingResult;
   _RehearsalStep? _rehearsalStep;
   FestivalZone? _focusedZone;
+  int _readyPulse = 0;
+  int _readyZones = 0;
   final _frontControl = GlobalKey();
   final _backControl = GlobalKey();
 
@@ -499,14 +553,26 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       _rehearsalStep == _RehearsalStep.signal;
 
   FestivalPerformance _newPerformance() {
+    _readyZones = 0;
+    final recovery = widget.recovery;
+    if (recovery != null) {
+      return FestivalPerformance.rewind(recovery, venue: widget.venue);
+    }
     final checkpoint = widget.checkpoint;
     if (checkpoint != null) {
-      return FestivalPerformance.replay(checkpoint, mastery: widget.mastery);
+      return FestivalPerformance.replay(
+        checkpoint,
+        mastery: widget.mastery,
+        venue: widget.venue,
+      );
     }
     final guided = widget.rehearse || !widget.records.rehearsalCompleted;
     _rehearsalStep = guided ? _RehearsalStep.volume : null;
     _focusedZone = guided ? FestivalZone.back : null;
-    final performance = FestivalPerformance(preserveRehearsalMix: guided);
+    final performance = FestivalPerformance(
+      preserveRehearsalMix: guided,
+      venue: widget.venue,
+    );
     if (!guided) performance.startMainConcert();
     return performance;
   }
@@ -522,7 +588,21 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   void _changeVolume(FestivalZone zone, int value) {
     setState(() {
       _focusedZone = zone;
+      final previous = FestivalZone.values.map(_performance.status).toList();
       _performance.setVolume(zone, value);
+      var readyZones = 0;
+      for (final audience in FestivalZone.values) {
+        final before = previous[audience.index];
+        final after = _performance.status(audience);
+        if ((before == CrowdStatus.quiet || before == CrowdStatus.loud) &&
+            (after == CrowdStatus.ready || after == CrowdStatus.singing)) {
+          readyZones |= 1 << audience.index;
+        }
+      }
+      if (readyZones != 0) {
+        _readyZones = readyZones;
+        _readyPulse++;
+      }
     });
     _updateAudio();
   }
@@ -579,19 +659,30 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   Future<void> _showResults() async {
     if (_openingResults) return;
     _openingResults = true;
-    final saved = await (_savingResult ??= _saveResult());
-    if (!mounted) return;
+    final saved = await _saveResult();
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
     final checkpoint = widget.checkpoint;
+    final recovery = widget.recovery;
     await _open(
       context,
       _ResultSound(
         volume: widget.records.volume / 100,
-        child: checkpoint == null
+        child: recovery != null
+            ? _RecoveryResults(
+                records: widget.records,
+                moment: recovery,
+                venue: widget.venue,
+                succeeded: _performance.recoverySucceeded,
+              )
+            : checkpoint == null
             ? _ResultsScreen(
                 records: widget.records,
                 score: _performance.score,
                 bestCombo: _performance.bestCombo,
                 returnHome: widget.returnHome,
+                venue: widget.venue,
+                missionAchieved: _performance.missionAchieved,
+                comboBreak: _performance.comboBreak,
                 results: [
                   for (var chorus = 1; chorus <= 3; chorus++)
                     _performance.chorusResult(chorus),
@@ -604,6 +695,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
                 previous: widget.previousScore,
                 previousResult: widget.previousResult,
                 mastery: widget.mastery,
+                venue: widget.venue,
                 saved: saved,
               ),
       ),
@@ -698,7 +790,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       previousTick = timer.tick;
       if (_performance.finished) {
         _freezeScene();
-        _savingResult = _saveResult();
+        unawaited(_showResults());
       } else if (skipped && _audio != null) {
         _freezeScene();
         _resumeScene();
@@ -735,7 +827,9 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(dialog, _PauseAction.exit),
             child: Text(
-              widget.returnHome
+              widget.recovery != null
+                  ? '전체 결과로'
+                  : widget.returnHome
                   ? '시작 화면으로'
                   : widget.checkpoint == null || widget.mastery
                   ? '공연 선택으로'
@@ -754,7 +848,6 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     if (action == _PauseAction.restart) {
       setState(() {
         _performance = _newPerformance();
-        _savingResult = null;
       });
     }
     if (action == _PauseAction.skipRehearsal) {
@@ -782,7 +875,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   Widget _pauseButton() => CupertinoButton(
     padding: EdgeInsets.zero,
     minimumSize: const Size(48, 40),
-    onPressed: _pause,
+    onPressed: _performance.finished ? null : _pause,
     child: Semantics(label: '일시정지', child: Icon(CupertinoIcons.pause_fill)),
   );
 
@@ -801,6 +894,10 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       focusedZone: zone,
       focusedVolume: zone == null ? null : performance.volume(zone),
       onZoneSelected: _rehearsalStep == null ? _selectZone : null,
+      venue: performance.venue,
+      lightingTier: performance.lightingTier,
+      readyPulse: _readyPulse,
+      readyZones: _readyZones,
     );
   }
 
@@ -930,7 +1027,9 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   Widget _buildPerformance(BuildContext context, BoxConstraints viewport) {
     final chorus = widget.checkpoint?.chorus;
     final performance = _performance;
-    final notice = performance.eventNotice;
+    final notice = widget.recovery != null && performance.rescueBeats == 0
+        ? ('${widget.recovery!.zoneLabel}을 맞춰 이 박의 떼창을 살려요', null)
+        : performance.eventNotice;
     final media = MediaQuery.of(context);
     final safeWidth = viewport.maxWidth - media.padding.horizontal;
     final bodyHeight =
@@ -947,8 +1046,10 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     final compact =
         standardText &&
         (sideBySide || safeWidth <= 380 || bodyHeight < fullSceneHeight + 390);
-    final title = chorus == null
-        ? '동네 축제 공연'
+    final title = widget.recovery != null
+        ? '콤보 복구 연습'
+        : chorus == null
+        ? '${widget.venue.title} 공연'
         : widget.mastery
         ? '숙련 후렴 도전'
         : '후렴 $chorus 연습';
@@ -966,6 +1067,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         status: performance.status(zone),
         volume: performance.volume(zone),
         selected: _focusedZone == zone,
+        needsRescue: performance.needsRescue(zone),
         onVolumeChanged: (value) => _changeVolume(zone, value),
         signalState: performance.signal(zone),
         onSignal: () => _sendSignal(zone),
@@ -993,9 +1095,13 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     );
     final countdown = performance.nextSignalCountdown;
     final beats = BeatStrip(
-      remaining: countdown?.remaining ?? performance.remainingBeats,
+      remaining: performance.rescueBeats > 0
+          ? performance.rescueBeats
+          : countdown?.remaining ?? performance.remainingBeats,
       total: countdown?.total ?? 6,
-      label: countdown == null
+      label: performance.rescueBeats > 0
+          ? '콤보 복구 ${performance.rescueBeats}박'
+          : countdown == null
           ? null
           : '후렴 ${countdown.chorus} 신호까지 ${countdown.remaining}박',
       combo: performance.combo,
@@ -1043,9 +1149,6 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
             )
           : null,
       trailing: _pauseButton(),
-      footer: performance.finished
-          ? _Action('결과 보기', _showResults, primary: true)
-          : null,
       children: sideBySide
           ? [
               Row(
@@ -1121,6 +1224,9 @@ class _ResultsScreen extends StatelessWidget {
     required this.score,
     required this.bestCombo,
     required this.returnHome,
+    required this.venue,
+    required this.missionAchieved,
+    required this.comboBreak,
     required this.results,
     required this.saved,
   });
@@ -1129,18 +1235,58 @@ class _ResultsScreen extends StatelessWidget {
   final int score;
   final int bestCombo;
   final bool returnHome;
+  final FestivalVenue venue;
+  final bool missionAchieved;
+  final ComboBreak? comboBreak;
   final List<ChorusResult> results;
   final bool saved;
 
   @override
   Widget build(BuildContext context) {
     final recommended = recommendedChorusPractice(results);
+    final lost = comboBreak;
     return _Screen(
       title: '전체 결과',
       children: [
         PerformanceScore(score: score),
         Text('이번 공연 최고 콤보 $bestCombo박', style: const TextStyle(color: _muted)),
+        Text(
+          '${missionAchieved ? '목표 달성' : '목표'} · ${venue.mission}',
+          style: TextStyle(color: missionAchieved ? _mint : _muted),
+        ),
         if (!saved) const Text('최고 기록을 저장하지 못했어요.'),
+        if (venue == FestivalVenue.neighborhood &&
+            missionAchieved &&
+            records.nightMarketUnlocked)
+          _Action(
+            '다음 무대 · 야외 야시장',
+            () => _open(
+              context,
+              _PerformanceScreen(
+                records: records,
+                venue: FestivalVenue.nightMarket,
+                returnHome: returnHome,
+              ),
+              replace: true,
+            ),
+            primary: true,
+          ),
+        if (lost != null) ...[
+          Text(
+            '${lost.combo}콤보 끊김 · 후렴 ${lost.chorus} ${lost.beat}박 · ${lost.zoneLabel}',
+          ),
+          _Action(
+            '끊기기 3초 전부터 연습',
+            () => _open(
+              context,
+              _PerformanceScreen(
+                records: records,
+                venue: venue,
+                recovery: lost,
+              ),
+            ),
+          ),
+        ],
         for (final result in results) ...[
           ChorusSummary(
             result: result,
@@ -1153,6 +1299,7 @@ class _ResultsScreen extends StatelessWidget {
               _PerformanceScreen(
                 records: records,
                 checkpoint: result.checkpoint,
+                venue: venue,
                 previousScore: result.score,
                 previousResult: result,
               ),
@@ -1164,7 +1311,11 @@ class _ResultsScreen extends StatelessWidget {
           '공연 다시 하기',
           () => _open(
             context,
-            _PerformanceScreen(records: records, returnHome: returnHome),
+            _PerformanceScreen(
+              records: records,
+              returnHome: returnHome,
+              venue: venue,
+            ),
             replace: true,
           ),
           primary: true,
@@ -1178,6 +1329,53 @@ class _ResultsScreen extends StatelessWidget {
   }
 }
 
+class _RecoveryResults extends StatelessWidget {
+  const _RecoveryResults({
+    required this.records,
+    required this.moment,
+    required this.venue,
+    required this.succeeded,
+  });
+
+  final FestivalRecords records;
+  final ComboBreak moment;
+  final FestivalVenue venue;
+  final bool succeeded;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Screen(
+      title: '콤보 복구 연습 결과',
+      children: [
+        Text(
+          succeeded
+              ? '두 줄이 다시 합류했어요!'
+              : '${moment.zoneLabel} 볼륨을 한 박 더 일찍 맞춰봐요.',
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+        ),
+        Text(
+          '후렴 ${moment.chorus} · ${moment.beat}박',
+          style: const TextStyle(color: _muted),
+        ),
+        _Action(
+          '이 순간 다시 연습',
+          () => _open(
+            context,
+            _PerformanceScreen(
+              records: records,
+              venue: venue,
+              recovery: moment,
+            ),
+            replace: true,
+          ),
+          primary: true,
+        ),
+        _Action('전체 결과로', () => Navigator.of(context).pop()),
+      ],
+    );
+  }
+}
+
 class _PracticeResultsScreen extends StatelessWidget {
   const _PracticeResultsScreen({
     required this.records,
@@ -1185,6 +1383,7 @@ class _PracticeResultsScreen extends StatelessWidget {
     this.previous,
     this.previousResult,
     required this.mastery,
+    required this.venue,
     required this.saved,
   });
 
@@ -1193,6 +1392,7 @@ class _PracticeResultsScreen extends StatelessWidget {
   final int? previous;
   final ChorusResult? previousResult;
   final bool mastery;
+  final FestivalVenue venue;
   final bool saved;
 
   @override
@@ -1233,6 +1433,7 @@ class _PracticeResultsScreen extends StatelessWidget {
             _PerformanceScreen(
               records: records,
               checkpoint: result.checkpoint,
+              venue: venue,
               previousScore: result.score,
               previousResult: result,
               mastery: mastery,

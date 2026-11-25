@@ -12,12 +12,16 @@ class FestivalRecords {
   static const _vibration = 'festival.vibration';
   static const _rehearsal = 'festival.guidedRehearsal.v2';
   static const _concert = 'festival.concert.v1';
+  static const _marketConcert = 'festival.marketConcert.v1';
+  static const _marketUnlocked = 'festival.marketUnlocked';
   static const _mastery = 'festival.mastery';
 
   int get volume => _preferences.getInt(_volume) ?? 70;
   bool get vibration => _preferences.getBool(_vibration) ?? true;
   bool get rehearsalCompleted => _preferences.getBool(_rehearsal) ?? false;
   int? get masteryBest => _preferences.getInt(_mastery);
+  bool get nightMarketUnlocked =>
+      _preferences.getBool(_marketUnlocked) ?? false;
 
   Future<bool> setVolume(int value) =>
       _preferences.setInt(_volume, value.clamp(0, 100));
@@ -25,8 +29,14 @@ class FestivalRecords {
       _preferences.setBool(_vibration, value);
   Future<bool> completeRehearsal() => _preferences.setBool(_rehearsal, true);
 
-  ({int score, ChorusCheckpoint checkpoint})? get concertBest {
-    final stored = _preferences.getString(_concert);
+  ({int score, ChorusCheckpoint checkpoint})? get concertBest =>
+      bestFor(FestivalVenue.neighborhood);
+
+  String _recordKey(FestivalVenue venue) =>
+      venue == FestivalVenue.neighborhood ? _concert : _marketConcert;
+
+  ({int score, ChorusCheckpoint checkpoint})? bestFor(FestivalVenue venue) {
+    final stored = _preferences.getString(_recordKey(venue));
     if (stored == null) return null;
     try {
       final value = jsonDecode(stored);
@@ -52,14 +62,21 @@ class FestivalRecords {
           : true;
     }
     if (performance.practiceChorus != null) return true;
-    final best = concertBest;
-    if (best != null && score <= best.score) return true;
-    return _preferences.setString(
-      _concert,
-      jsonEncode({
-        'score': score,
-        'finalChorus': performance.chorusResult(3).checkpoint.toRecord(),
-      }),
-    );
+    final best = bestFor(performance.venue);
+    final saved = await Future.wait([
+      if (performance.venue == FestivalVenue.neighborhood &&
+          performance.missionAchieved &&
+          !nightMarketUnlocked)
+        _preferences.setBool(_marketUnlocked, true),
+      if (best == null || score > best.score)
+        _preferences.setString(
+          _recordKey(performance.venue),
+          jsonEncode({
+            'score': score,
+            'finalChorus': performance.chorusResult(3).checkpoint.toRecord(),
+          }),
+        ),
+    ]);
+    return saved.every((success) => success);
   }
 }

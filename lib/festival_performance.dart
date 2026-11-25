@@ -9,10 +9,64 @@ const _frontProximityBoost = 14;
 const _readyMinimum = 56;
 const _readyMaximum = 68;
 const _generatorStopTick = 79 * _ticksPerSecond + _ticksPerBeat;
+const _rescueBeats = 2;
+const _rewindTicks = 3 * _ticksPerSecond;
 
 enum FestivalZone { front, back }
 
 enum FestivalCue { call, applause, singalong, generatorStop }
+
+enum FestivalVenue {
+  neighborhood('동네 축제', '두 줄이 8박 연속 떼창하기'),
+  nightMarket('야외 야시장', '발전기가 꺼진 뒤 4박 안에 두 줄 합류시키기');
+
+  const FestivalVenue(this.title, this.mission);
+
+  final String title;
+  final String mission;
+}
+
+String _missingLabel(int mask) => switch (mask) {
+  1 => '앞줄',
+  2 => '뒷줄',
+  _ => '두 줄',
+};
+
+typedef _MixSnapshot = ({
+  int tick,
+  List<int> volumes,
+  List<CrowdStatus> levels,
+  List<bool> singing,
+  FestivalZone? reserved,
+  int? reservedTick,
+  bool signalSucceeded,
+  int leadBeats,
+  bool transferReady,
+  int combo,
+  bool joinedTogether,
+  bool rescueUsed,
+});
+
+class ComboBreak {
+  const ComboBreak._(
+    this.chorus,
+    this.beat,
+    this.missedTick,
+    this.combo,
+    this._mask,
+    this._mix,
+  );
+
+  final int chorus;
+  final int beat;
+  final int missedTick;
+  final int combo;
+  final int _mask;
+  final _MixSnapshot _mix;
+
+  int get rewindTick => _mix.tick;
+  String get zoneLabel => _missingLabel(_mask);
+}
 
 class ChorusCheckpoint {
   ChorusCheckpoint._(
@@ -105,6 +159,8 @@ class FestivalPerformance {
     this.practiceChorus,
     this.mastery = false,
     this.preserveRehearsalMix = false,
+    this.venue = FestivalVenue.neighborhood,
+    this.recovery,
   }) : assert(
          practiceChorus == null || (practiceChorus >= 1 && practiceChorus <= 3),
        ),
@@ -122,11 +178,13 @@ class FestivalPerformance {
   factory FestivalPerformance.replay(
     ChorusCheckpoint checkpoint, {
     bool mastery = false,
+    FestivalVenue venue = FestivalVenue.neighborhood,
   }) {
     assert(!mastery || checkpoint.chorus == 3);
     final performance = FestivalPerformance(
       practiceChorus: checkpoint.chorus,
       mastery: mastery,
+      venue: venue,
     );
     performance._tick = checkpoint.tick;
     performance._volumes.setAll(0, checkpoint._volumes);
@@ -135,11 +193,40 @@ class FestivalPerformance {
     return performance;
   }
 
+  factory FestivalPerformance.rewind(
+    ComboBreak moment, {
+    required FestivalVenue venue,
+  }) {
+    final performance = FestivalPerformance(
+      practiceChorus: moment.chorus,
+      recovery: moment,
+      venue: venue,
+    );
+    final mix = moment._mix;
+    performance._tick = mix.tick;
+    performance._volumes.setAll(0, mix.volumes);
+    performance._levels.setAll(0, mix.levels);
+    performance._singing.setAll(0, mix.singing);
+    performance._reserved = mix.reserved;
+    performance._reservedTick = mix.reservedTick;
+    performance._signalSucceeded = mix.signalSucceeded;
+    performance._leadBeats = mix.leadBeats;
+    performance._transferReady = mix.transferReady;
+    performance._combo = mix.combo;
+    performance._bestCombo = mix.combo;
+    performance._joinedTogetherThisChorus = mix.joinedTogether;
+    performance._rescueUsed = mix.rescueUsed;
+    return performance;
+  }
+
   final int? practiceChorus;
   final bool mastery;
   final bool preserveRehearsalMix;
+  final FestivalVenue venue;
+  final ComboBreak? recovery;
   int get _generatorEnd =>
-      _generatorStopTick + (mastery ? 2 * _ticksPerBeat : 0);
+      _generatorStopTick +
+      (mastery || venue == FestivalVenue.nightMarket ? 2 * _ticksPerBeat : 0);
   int _tick;
   final _volumes = [50, 40];
   final _levels = [CrowdStatus.quiet, CrowdStatus.quiet];
@@ -154,6 +241,16 @@ class FestivalPerformance {
   int _leadBeats = 0;
   int _combo = 0;
   int _bestCombo = 0;
+  int _togetherStreak = 0;
+  int _bestTogetherStreak = 0;
+  bool _marketMissionDone = false;
+  bool _rescueUsed = false;
+  int? _rescueUntil;
+  int _missingMask = 0;
+  ComboBreak? _pendingBreak;
+  ComboBreak? _comboBreak;
+  bool _recoverySucceeded = false;
+  final _recentMixes = <int, _MixSnapshot>{};
   bool _joinedTogetherThisChorus = false;
   bool _transferReady = false;
   int? _waveTick;
@@ -166,9 +263,27 @@ class FestivalPerformance {
   int get score => _halfPoints.reduce((a, b) => a + b) ~/ 2;
   int get combo => _combo;
   int get bestCombo => _bestCombo;
+  int get lightingTier => combo >= 40
+      ? 3
+      : combo >= 25
+      ? 2
+      : combo >= 10
+      ? 1
+      : 0;
+  ComboBreak? get comboBreak => _comboBreak;
+  bool get recoverySucceeded => _recoverySucceeded;
+  bool get missionAchieved => switch (venue) {
+    FestivalVenue.neighborhood => _bestTogetherStreak >= 8,
+    FestivalVenue.nightMarket => _marketMissionDone,
+  };
+  int get rescueBeats => _rescueUntil == null
+      ? 0
+      : (_rescueUntil! - _tick + _ticksPerBeat - 1) ~/ _ticksPerBeat;
+  bool needsRescue(FestivalZone zone) =>
+      rescueBeats > 0 && _missingMask & (1 << zone.index) != 0;
   bool get holdingCombo =>
       _combo > 0 &&
-      !_joinedTogetherThisChorus &&
+      (!_joinedTogetherThisChorus || rescueBeats > 0) &&
       !finished &&
       seconds < _choruses.last.end;
   List<int> get chorusScores =>
@@ -183,10 +298,15 @@ class FestivalPerformance {
   }
 
   int get maximum => practiceChorus == null ? 90 : 30;
-  bool get finished =>
-      _tick >=
-      (practiceChorus == null ? 100 : _choruses[practiceChorus! - 1].end) *
-          _ticksPerSecond;
+  bool get finished {
+    final end =
+        (practiceChorus == null ? 100 : _choruses[practiceChorus! - 1].end) *
+        _ticksPerSecond;
+    final drill = recovery;
+    return _tick >= end ||
+        (drill != null && _tick >= drill.missedTick + _rewindTicks);
+  }
+
   bool get generatorRunning =>
       _tick >= 76 * _ticksPerSecond && _tick < _generatorEnd;
   Duration get generatorLoopPosition =>
@@ -283,6 +403,12 @@ class FestivalPerformance {
 
   (String, int?) get eventNotice {
     if (finished) return ('공연 종료 · 결과를 확인해요', null);
+    if (rescueBeats > 0) {
+      return (
+        '${_missingLabel(_missingMask)} 볼륨 복구 · $rescueBeats박 안에 ✓ 준비',
+        null,
+      );
+    }
     if (seconds < 14 && practiceChorus == null) {
       return status(FestivalZone.back) == CrowdStatus.ready
           ? ('리허설 · 노란 신호 버튼을 기다려요', null)
@@ -294,10 +420,20 @@ class FestivalPerformance {
       >= 76 && < 81 => ('발전기 정지', _generatorEnd),
       _ => null,
     };
+    if (seconds >= 78 && seconds < 81 && _reserved == null) {
+      if (generatorRunning) {
+        return (
+          '앞줄 먼저 시작 · 또는 발전기 정지까지 기다려요',
+          (_generatorEnd - _tick + _ticksPerBeat - 1) ~/ _ticksPerBeat,
+        );
+      }
+      return ('발전기 정지 · 준비된 뒷줄에서 두 줄 동시 시작', null);
+    }
     if (due != null && _tick < due.$2) {
       return (due.$1, (due.$2 - _tick + _ticksPerBeat - 1) ~/ _ticksPerBeat);
     }
     if (_tick >= _generatorEnd && seconds < 82) return ('발전기 정지 완료', null);
+    if (_marketNoise) return ('야시장 소음 · 뒷줄 볼륨을 올려요', null);
     final interlude = _interlude;
     if (interlude != null) {
       return (_interludeNotice(interlude.previous, interlude.next), null);
@@ -331,6 +467,9 @@ class FestivalPerformance {
     if (seconds >= _choruses.last.end) return ('마지막 후렴 종료 · 공연 마무리 중', null);
     return holdingCombo ? ('두 줄을 다시 맞추면 콤보가 이어져요', null) : ('다음 신호 준비', null);
   }
+
+  bool get _marketNoise =>
+      venue == FestivalVenue.nightMarket && seconds >= 24 && seconds < 28;
 
   String _interludeNotice(_Chorus previous, _Chorus next) {
     if (seconds < previous.end + 2) {
@@ -446,6 +585,9 @@ class FestivalPerformance {
         _saveCheckpoint(current.number);
       }
       if (current != null) _applyBeat(current);
+      if (practiceChorus == null && current != null && current.number > 0) {
+        _rememberMix();
+      }
     }
   }
 
@@ -472,19 +614,99 @@ class FestivalPerformance {
         (_singing[0] ? 1 : 0) + (_singing[1] ? 1 : 0) + (together ? 1 : 0);
     if (together) {
       _joinedTogetherThisChorus = true;
+      _clearRescue();
       _combo++;
       if (_combo > _bestCombo) _bestCombo = _combo;
+      _togetherStreak++;
+      if (_togetherStreak > _bestTogetherStreak) {
+        _bestTogetherStreak = _togetherStreak;
+      }
+      if (beatStart >= _generatorEnd &&
+          beatStart < _generatorEnd + 4 * _ticksPerBeat) {
+        _marketMissionDone = true;
+      }
+      final drill = recovery;
+      if (drill != null &&
+          beatStart >= drill.missedTick &&
+          beatStart <= drill.missedTick + _rescueBeats * _ticksPerBeat) {
+        _recoverySucceeded = true;
+      }
     } else if (_joinedTogetherThisChorus ||
         beatStart >= chorus.start * _ticksPerSecond + _joinGrace) {
-      _combo = 0;
+      _togetherStreak = 0;
+      if (_combo > 0) _handleMiss(chorus, beatStart);
     }
+  }
+
+  void _handleMiss(_Chorus chorus, int beatStart) {
+    final missing = (_singing[0] ? 0 : 1) | (_singing[1] ? 0 : 2);
+    final mix = _recentMixes[beatStart - _rewindTicks];
+    if (_rescueUntil == null && mix != null) {
+      final firstBeat = chorus.start * _ticksPerSecond;
+      _pendingBreak = ComboBreak._(
+        chorus.number,
+        (beatStart - firstBeat) ~/ _ticksPerBeat + 1,
+        beatStart,
+        _combo,
+        missing,
+        mix,
+      );
+    }
+    final end = chorus.end * _ticksPerSecond;
+    if (_rescueUntil != null && _tick < _rescueUntil!) {
+      _missingMask = missing;
+      return;
+    }
+    if (!_rescueUsed && _joinedTogetherThisChorus && _tick < end) {
+      _rescueUsed = true;
+      _rescueUntil = (_tick + _rescueBeats * _ticksPerBeat).clamp(_tick, end);
+      _missingMask = missing;
+      return;
+    }
+    final lost = _pendingBreak;
+    if (lost != null &&
+        (_comboBreak == null || lost.combo > _comboBreak!.combo)) {
+      _comboBreak = lost;
+    }
+    _combo = 0;
+    _clearRescue();
+  }
+
+  void _clearRescue() {
+    _rescueUntil = null;
+    _missingMask = 0;
+    _pendingBreak = null;
+  }
+
+  void _rememberMix() {
+    _recentMixes[_tick] = (
+      tick: _tick,
+      volumes: List.of(_volumes),
+      levels: List.of(_levels),
+      singing: List.of(_singing),
+      reserved: _reserved,
+      reservedTick: _reservedTick,
+      signalSucceeded: _signalSucceeded,
+      leadBeats: _leadBeats,
+      transferReady: _transferReady,
+      combo: _combo,
+      joinedTogether: _joinedTogetherThisChorus,
+      rescueUsed: _rescueUsed,
+    );
+    _recentMixes.removeWhere(
+      (tick, _) => tick < _tick - _rewindTicks - _ticksPerBeat,
+    );
   }
 
   void _refreshLevels() {
     for (var i = 0; i < 2; i++) {
       final modifier = i == 0
           ? (seconds >= 48 ? _frontProximityBoost : 0)
-          : (generatorRunning ? -16 : 0);
+          : (generatorRunning
+                ? -16
+                : _marketNoise
+                ? -10
+                : 0);
       _levels[i] = _levelFor(i, modifier);
     }
   }
@@ -513,6 +735,9 @@ class FestivalPerformance {
     _signalSucceeded = false;
     _leadBeats = 0;
     _joinedTogetherThisChorus = false;
+    _togetherStreak = 0;
+    _rescueUsed = false;
+    _clearRescue();
     _transferReady = false;
     _waveTick = null;
   }
@@ -521,6 +746,12 @@ class FestivalPerformance {
     if (_tick < chorus.start * _ticksPerSecond) return;
     if (_tick == _reservedTick) {
       _signalSucceeded = _levels[_reserved!.index] == CrowdStatus.ready;
+      if (chorus.number == 3 &&
+          _reserved == FestivalZone.back &&
+          _tick >= _generatorEnd &&
+          _levels.every((level) => level == CrowdStatus.ready)) {
+        _transferReady = true;
+      }
       _cues.add((FestivalCue.call, _tick));
     }
 

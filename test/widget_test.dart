@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laureol/festival_performance.dart';
-import 'package:laureol/festival_scene.dart';
 import 'package:laureol/festival_records.dart';
+import 'package:laureol/festival_scene.dart';
 import 'package:laureol/main.dart';
 import 'package:laureol/performance_controls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -63,6 +63,7 @@ void main() {
     await tester.pump();
     expect(scene().focusedZone, FestivalZone.back);
     expect(scene().focusedVolume, 50);
+    expect(scene().readyZones, 1 << FestivalZone.back.index);
     expect(find.text('라우럴!'), findsNothing);
     await gesture.up();
     await tester.pump();
@@ -220,12 +221,17 @@ void main() {
       );
       expect(find.text('후렴 2 신호까지 8박'), findsOneWidget);
 
-      await tester.pump(const Duration(seconds: 100));
-      final results = find.text('결과 보기');
-      expect(results.hitTestable(), findsOneWidget);
-      await tester.tap(results);
+      final closingTick = tester
+          .widget<FestivalScene>(find.byType(FestivalScene))
+          .tick;
+      await tester.pump(festivalTick * (799 - closingTick));
+      expect(find.byType(FestivalScene), findsOneWidget);
+      expect(find.text('전체 결과'), findsNothing);
+      await tester.pump(festivalTick);
       await tester.pumpAndSettle();
       expect(find.text('전체 결과'), findsOneWidget);
+      expect(find.text('결과 보기'), findsNothing);
+      expect(records.concertBest, isNotNull);
       expect(tester.takeException(), isNull);
     }, variant: TargetPlatformVariant({TargetPlatform.iOS}));
   }
@@ -284,6 +290,9 @@ void main() {
     await tapLabel('뒤로');
     await tapLabel('공연 시작');
     expect(find.text('공연 선택'), findsOneWidget);
+    expect(find.text('야외 야시장'), findsOneWidget);
+    expect(find.text('잠김'), findsOneWidget);
+    expect(find.text('야외 야시장 시작'), findsNothing);
     await tapLabel('동네 축제 시작');
     FestivalScene scene() =>
         tester.widget<FestivalScene>(find.byType(FestivalScene));
@@ -353,7 +362,7 @@ void main() {
     expect(checkControlsInView(), cardBounds);
 
     await tester.pump(Duration(milliseconds: (800 - scene().tick) * 125));
-    await tapLabel('결과 보기');
+    await tester.pumpAndSettle();
     expect(find.text('전체 결과'), findsOneWidget);
     expect(find.text('추천 연습 · 후렴 2 · 앞줄 미합류'), findsOneWidget);
     await tapLabel('후렴 2 연습 · 7/30');
@@ -365,7 +374,7 @@ void main() {
       50,
     );
     await tester.pump(Duration(milliseconds: (496 - scene().tick) * 125));
-    await tapLabel('결과 보기');
+    await tester.pumpAndSettle();
     expect(find.text('후렴 연습 결과'), findsOneWidget);
     expect(find.text('이전 떼창 기록'), findsOneWidget);
     expect(find.text('이번 떼창 기록'), findsOneWidget);
@@ -373,5 +382,55 @@ void main() {
     expect(find.text('전체 결과'), findsOneWidget);
     expect(records.concertBest?.score, 42);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Combo practice opens and returns from results automatically', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 740));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(LaureolApp(records: records));
+    await tester.tap(find.text('공연 시작'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('동네 축제 시작'));
+    await tester.pumpAndSettle();
+
+    FestivalScene scene() =>
+        tester.widget<FestivalScene>(find.byType(FestivalScene));
+    Future<void> advanceTo(int tick) =>
+        tester.pump(festivalTick * (tick - scene().tick));
+    final rearTrack = find.descendant(
+      of: find.byType(ZoneVolumeSlider).last,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is GestureDetector && widget.onHorizontalDragUpdate != null,
+      ),
+    );
+    final track = tester.getRect(rearTrack);
+    const missedTick = 212;
+    await advanceTo(176);
+    await tester.tapAt(track.center);
+    await tester.pump();
+    await tester.tap(find.text('라우럴!').first);
+    await advanceTo(208);
+    await tester.tapAt(Offset(track.left + track.width * .75, track.center.dy));
+    await advanceTo(800);
+    await tester.pumpAndSettle();
+
+    final retry = find.text('끊기기 3초 전부터 연습');
+    expect(retry, findsOneWidget);
+    final saved = records.concertBest?.score;
+    expect(saved, isNotNull);
+    await tester.tap(retry);
+    await tester.pumpAndSettle();
+    expect(scene().tick, inInclusiveRange(missedTick - 24, missedTick - 20));
+    await tester.pump(const Duration(seconds: 7));
+    await tester.pumpAndSettle();
+    expect(find.text('콤보 복구 연습 결과'), findsOneWidget);
+    expect(find.text('두 줄이 다시 합류했어요!'), findsOneWidget);
+    await tester.tap(find.text('전체 결과로'));
+    await tester.pumpAndSettle();
+    expect(find.text('전체 결과'), findsOneWidget);
+    expect(records.concertBest?.score, saved);
   });
 }

@@ -508,6 +508,7 @@ class ZoneControlCard extends StatelessWidget {
     this.onSignal,
     this.compact = false,
     this.selected = false,
+    this.needsRescue = false,
   });
 
   final String zone;
@@ -518,6 +519,7 @@ class ZoneControlCard extends StatelessWidget {
   final VoidCallback? onSignal;
   final bool compact;
   final bool selected;
+  final bool needsRescue;
 
   @override
   Widget build(BuildContext context) {
@@ -525,7 +527,13 @@ class ZoneControlCard extends StatelessWidget {
       padding: EdgeInsets.all(compact ? 8 : 12),
       decoration: BoxDecoration(
         color: _panel,
-        border: Border.all(color: selected ? status.color : _line),
+        border: Border.all(
+          color: needsRescue
+              ? _amber
+              : selected
+              ? status.color
+              : _line,
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(

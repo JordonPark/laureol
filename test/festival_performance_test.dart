@@ -51,6 +51,7 @@ void main() {
       total: 16,
     ));
     expect(performance.combo, 18);
+    expect(performance.lightingTier, 1);
     expect(performance.holdingCombo, isTrue);
 
     _at(performance, 36);
@@ -89,6 +90,7 @@ void main() {
       total: 16,
     ));
     expect(performance.combo, 36);
+    expect(performance.lightingTier, 2);
     _at(performance, 64);
     expect(performance.eventNotice.$1, contains('발전기가 켜지면 뒷줄'));
     _at(performance, 66);
@@ -99,6 +101,9 @@ void main() {
     _at(performance, 78);
     expect(performance.nextSignalCountdown, isNull);
     expect(performance.signal(front), SignalState.available);
+    performance.queue(front);
+    _at(performance, 83);
+    expect(performance.lightingTier, 3);
   });
 
   test('A missed beat ends the combo after the next chorus grace period', () {
@@ -114,6 +119,87 @@ void main() {
     expect(performance.combo, 0);
     expect(performance.bestCombo, 18);
   });
+
+  test(
+    'One rescue per chorus keeps the combo without awarding missed beats',
+    () {
+      final performance = FestivalPerformance();
+      _at(performance, 22);
+      performance.setVolume(FestivalZone.back, 50);
+      performance.queue(FestivalZone.front);
+      _at(performance, 26);
+      performance.setVolume(FestivalZone.back, 75);
+      _at(performance, 27);
+      expect(performance.combo, 3);
+      expect(performance.rescueBeats, 2);
+      expect(performance.needsRescue(FestivalZone.back), isTrue);
+      expect(performance.needsRescue(FestivalZone.front), isFalse);
+      final scoreBeforeCorrection = performance.score;
+      performance.setVolume(FestivalZone.back, 50);
+      _at(performance, 28);
+      expect(performance.combo, 4);
+      expect(performance.rescueBeats, 0);
+      expect(performance.score - scoreBeforeCorrection, 2);
+
+      performance.setVolume(FestivalZone.back, 75);
+      _at(performance, 29);
+      expect(performance.rescueBeats, 0);
+      expect(performance.combo, 0);
+      expect(performance.comboBreak?.zoneLabel, '뒷줄');
+    },
+  );
+
+  test(
+    'A failed rescue restores the mix exactly three seconds before the miss',
+    () {
+      final performance = FestivalPerformance();
+      _at(performance, 22);
+      performance.setVolume(FestivalZone.back, 50);
+      performance.queue(FestivalZone.front);
+      _at(performance, 26);
+      performance.setVolume(FestivalZone.back, 75);
+      _at(performance, 28);
+      final lost = performance.comboBreak!;
+      expect(lost.zoneLabel, '뒷줄');
+      expect(lost.missedTick - lost.rewindTick, 24);
+
+      final practice = FestivalPerformance.rewind(
+        lost,
+        venue: FestivalVenue.neighborhood,
+      );
+      expect(practice.position, const Duration(milliseconds: 23500));
+      expect(practice.volume(FestivalZone.back), 50);
+      expect(practice.signal(FestivalZone.front), SignalState.queued);
+      practice.advanceTicks(48);
+      expect(practice.finished, isTrue);
+      expect(practice.recoverySucceeded, isTrue);
+    },
+  );
+
+  test(
+    'The generator stop changes which final chorus strategy scores best',
+    () {
+      int score({required bool mastery, required bool wait}) {
+        final performance = FestivalPerformance(
+          practiceChorus: 3,
+          mastery: mastery,
+        );
+        _at(performance, wait ? (mastery ? 80.5 : 79.5) : 78);
+        performance.queue(wait ? FestivalZone.back : FestivalZone.front);
+        _at(performance, 90);
+        return performance.score;
+      }
+
+      expect(
+        score(mastery: false, wait: true),
+        greaterThan(score(mastery: false, wait: false)),
+      );
+      expect(
+        score(mastery: true, wait: false),
+        greaterThan(score(mastery: true, wait: true)),
+      );
+    },
+  );
 
   test('Generator follows the timeline even without a queued signal', () {
     final performance = FestivalPerformance(practiceChorus: 3);
