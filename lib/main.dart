@@ -4,6 +4,7 @@ import 'dart:async';
 // ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 
+import 'festival_performance.dart';
 import 'festival_scene.dart';
 import 'performance_controls.dart';
 
@@ -14,7 +15,6 @@ const _paper = Color(0xFFF7F2FF);
 const _muted = Color(0xFFBDB8CD);
 const _gold = Color(0xFFFFC46A);
 const _stage = 'docs/art/festival/stage.png';
-const _chorusScores = [15, 12, 15];
 
 Future<void> _open(
   BuildContext context,
@@ -206,9 +206,10 @@ class _SelectionScreen extends StatelessWidget {
 }
 
 class _PerformanceScreen extends StatefulWidget {
-  const _PerformanceScreen({this.chorus});
+  const _PerformanceScreen({this.chorus, this.previousScore});
 
   final int? chorus;
+  final int? previousScore;
 
   @override
   State<_PerformanceScreen> createState() => _PerformanceScreenState();
@@ -218,18 +219,14 @@ enum _PauseAction { resume, restart, exit }
 
 class _PerformanceScreenState extends State<_PerformanceScreen>
     with WidgetsBindingObserver {
-  int _front = 50;
-  int _back = 40;
-  bool? _queuedFront;
-  int _tick = 0;
-  int? _startTick;
-  int? _responseTick;
+  late FestivalPerformance _performance;
   Timer? _clock;
   bool _pauseOpen = false;
 
   @override
   void initState() {
     super.initState();
+    _performance = FestivalPerformance(practiceChorus: widget.chorus);
     WidgetsBinding.instance.addObserver(this);
     _resumeScene();
   }
@@ -251,46 +248,17 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     }
   }
 
-  bool get _generatorRunning => _startTick == null || _tick < _startTick! + 8;
-
   void _resumeScene() {
-    _clock ??= Timer.periodic(const Duration(milliseconds: 125), (_) {
-      setState(() {
-        _tick++;
-        final start = _startTick;
-        if (start != null &&
-            _responseTick == null &&
-            _tick >= start + 8 &&
-            (_tick - start) % 4 == 0 &&
-            _status(_front, _back) == CrowdStatus.ready &&
-            _status(_back, _front) == CrowdStatus.ready) {
-          _responseTick = _tick;
-        }
-      });
+    if (_clock != null || _performance.finished) return;
+    var previousTick = 0;
+    _clock = Timer.periodic(festivalTick, (timer) {
+      setState(() => _performance.advanceTicks(timer.tick - previousTick));
+      previousTick = timer.tick;
+      if (_performance.finished) {
+        timer.cancel();
+        _clock = null;
+      }
     });
-  }
-
-  void _queueSignal(bool front) {
-    if (_queuedFront != null) return;
-    setState(() {
-      _queuedFront = front;
-      _startTick = (_tick ~/ 4 + 1) * 4;
-    });
-  }
-
-  CrowdStatus _status(int volume, int other) {
-    final level = volume + other * 0.2;
-    if (level < 56) return CrowdStatus.quiet;
-    if (level > 68) return CrowdStatus.loud;
-    return CrowdStatus.ready;
-  }
-
-  SignalState _signal(bool front) {
-    if (_queuedFront == null) return SignalState.available;
-    if (_queuedFront == front) {
-      return _tick < _startTick! ? SignalState.queued : SignalState.waiting;
-    }
-    return _responseTick == null ? SignalState.responding : SignalState.waiting;
   }
 
   Future<void> _pause() async {
@@ -326,12 +294,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     }
     if (action == _PauseAction.restart) {
       setState(() {
-        _front = 50;
-        _back = 40;
-        _queuedFront = null;
-        _tick = 0;
-        _startTick = null;
-        _responseTick = null;
+        _performance = FestivalPerformance(practiceChorus: widget.chorus);
       });
     }
     if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed ||
@@ -343,40 +306,19 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   @override
   Widget build(BuildContext context) {
     final chorus = widget.chorus;
-    final start = _startTick;
-    final response = _responseTick;
-    final waveAge = response == null ? null : _tick - response;
-    final frontReady = _status(_front, _back);
-    final backReady = _status(_back, _front);
-    final canSing = start != null && _tick >= start;
-    final frontStatus =
-        canSing &&
-            frontReady == CrowdStatus.ready &&
-            (_queuedFront == true || response != null)
-        ? CrowdStatus.singing
-        : frontReady;
-    final backStatus =
-        canSing &&
-            backReady == CrowdStatus.ready &&
-            (_queuedFront == false || response != null)
-        ? CrowdStatus.singing
-        : backReady;
-    final front = ZoneControlCard(
-      zone: '앞줄',
-      status: frontStatus,
-      volume: _front,
-      onVolumeChanged: (value) => setState(() => _front = value),
-      signalState: _signal(true),
-      onSignal: () => _queueSignal(true),
+    final performance = _performance;
+    final notice = performance.eventNotice;
+    ZoneControlCard card(FestivalZone zone, String label) => ZoneControlCard(
+      zone: label,
+      status: performance.status(zone),
+      volume: performance.volume(zone),
+      onVolumeChanged: (value) =>
+          setState(() => performance.setVolume(zone, value)),
+      signalState: performance.signal(zone),
+      onSignal: () => setState(() => performance.queue(zone)),
     );
-    final back = ZoneControlCard(
-      zone: '뒷줄',
-      status: backStatus,
-      volume: _back,
-      onVolumeChanged: (value) => setState(() => _back = value),
-      signalState: _signal(false),
-      onSignal: () => _queueSignal(false),
-    );
+    final front = card(FestivalZone.front, '앞줄');
+    final back = card(FestivalZone.back, '뒷줄');
 
     return _Screen(
       title: chorus == null ? '동네 축제 공연' : '후렴 $chorus 연습',
@@ -388,34 +330,20 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       ),
       children: [
         FestivalScene(
-          tick: _tick,
-          front: frontStatus,
-          back: backStatus,
-          generatorRunning: _generatorRunning,
-          signalQueued: start != null && _tick < start,
-          waveFrame: waveAge != null && waveAge < 4 ? waveAge : null,
-          waveTowardBack: _queuedFront == true,
+          tick: performance.tick,
+          front: performance.status(FestivalZone.front),
+          back: performance.status(FestivalZone.back),
+          generatorRunning: performance.generatorRunning,
+          signalQueued: performance.signalQueued,
+          waveFrame: performance.waveFrame,
+          waveTowardBack: performance.waveTowardBack,
         ),
-        const Text('조작 미리보기', style: TextStyle(color: _muted)),
         PerformanceScore(
-          score: chorus == null ? 42 : _chorusScores[chorus - 1],
-          maximum: chorus == null ? 90 : 30,
+          score: performance.score,
+          maximum: performance.maximum,
         ),
-        EventNotice(
-          message: _generatorRunning ? '발전기 정지' : '발전기 정지 완료',
-          remainingBeats: !_generatorRunning
-              ? null
-              : start == null
-              ? 2
-              : ((start + 8 - _tick) / 4).ceil(),
-        ),
-        BeatStrip(
-          remaining: start == null
-              ? 4
-              : _tick < start
-              ? 1
-              : 0,
-        ),
+        EventNotice(message: notice.$1, remainingBeats: notice.$2),
+        BeatStrip(remaining: performance.remainingBeats, total: 6),
         LayoutBuilder(
           builder: (context, constraints) {
             final largeText = MediaQuery.textScalerOf(context).scale(14) > 20;
@@ -435,36 +363,49 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
             );
           },
         ),
-        _Action(
-          '예시 결과 보기',
-          () => _open(
-            context,
-            chorus == null
-                ? const _ResultsScreen()
-                : _PracticeResultsScreen(chorus: chorus),
-            replace: true,
+        if (performance.finished)
+          _Action(
+            '결과 보기',
+            () => _open(
+              context,
+              chorus == null
+                  ? _ResultsScreen(
+                      score: performance.score,
+                      chorusScores: performance.chorusScores,
+                    )
+                  : _PracticeResultsScreen(
+                      chorus: chorus,
+                      score: performance.score,
+                      previous: widget.previousScore,
+                    ),
+              replace: true,
+            ),
+            primary: true,
           ),
-          primary: true,
-        ),
       ],
     );
   }
 }
 
 class _ResultsScreen extends StatelessWidget {
-  const _ResultsScreen();
+  const _ResultsScreen({required this.score, required this.chorusScores});
+
+  final int score;
+  final List<int> chorusScores;
 
   @override
   Widget build(BuildContext context) {
     return _Screen(
       title: '전체 결과',
       children: [
-        const PerformanceScore(score: 42),
-        const Text('예시 기록 · 다음 공연장까지 3점', style: TextStyle(color: _muted)),
-        for (var i = 0; i < _chorusScores.length; i++)
+        PerformanceScore(score: score),
+        for (var i = 0; i < chorusScores.length; i++)
           _Action(
-            '후렴 ${i + 1} 연습 · ${_chorusScores[i]}/30',
-            () => _open(context, _PerformanceScreen(chorus: i + 1)),
+            '후렴 ${i + 1} 연습 · ${chorusScores[i]}/30',
+            () => _open(
+              context,
+              _PerformanceScreen(chorus: i + 1, previousScore: chorusScores[i]),
+            ),
           ),
         _Action(
           '공연 다시 하기',
@@ -478,13 +419,19 @@ class _ResultsScreen extends StatelessWidget {
 }
 
 class _PracticeResultsScreen extends StatelessWidget {
-  const _PracticeResultsScreen({required this.chorus});
+  const _PracticeResultsScreen({
+    required this.chorus,
+    required this.score,
+    this.previous,
+  });
+
+  final int score;
+  final int? previous;
 
   final int chorus;
 
   @override
   Widget build(BuildContext context) {
-    final previous = _chorusScores[chorus - 1];
     return _Screen(
       title: '후렴 연습 결과',
       children: [
@@ -492,15 +439,19 @@ class _PracticeResultsScreen extends StatelessWidget {
           '후렴 $chorus',
           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
-        PerformanceScore(score: previous + 3, maximum: 30),
-        Text(
-          '예시 비교 · 이전 $previous점 → ${previous + 3}점',
-          style: const TextStyle(color: _muted),
-        ),
+        PerformanceScore(score: score, maximum: 30),
+        if (previous != null)
+          Text(
+            '이전 $previous점 → $score점',
+            style: const TextStyle(color: _muted),
+          ),
         _Action(
           '이 후렴 다시 연습',
-          () =>
-              _open(context, _PerformanceScreen(chorus: chorus), replace: true),
+          () => _open(
+            context,
+            _PerformanceScreen(chorus: chorus, previousScore: score),
+            replace: true,
+          ),
           primary: true,
         ),
         _Action('전체 결과로', () => Navigator.of(context).pop()),

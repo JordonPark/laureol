@@ -25,7 +25,7 @@ enum CrowdStatus {
 enum SignalState {
   waiting('신호 대기'),
   available('라우럴!'),
-  queued('다음 박 시작'),
+  queued('신호 예약'),
   responding('받아 부를 차례');
 
   const SignalState(this.label);
