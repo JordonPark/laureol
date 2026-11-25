@@ -7,6 +7,73 @@ const _generatorStopTick = 79 * _ticksPerSecond + _ticksPerBeat;
 
 enum FestivalZone { front, back }
 
+class ChorusCheckpoint {
+  ChorusCheckpoint._(
+    this.chorus,
+    this.tick,
+    List<int> volumes,
+    List<CrowdStatus> levels,
+  ) : _volumes = List.unmodifiable(volumes),
+      _levels = List.unmodifiable(levels);
+
+  final int chorus;
+  final int tick;
+  final List<int> _volumes;
+  final List<CrowdStatus> _levels;
+
+  List<int> toRecord() => [
+    chorus,
+    tick,
+    ..._volumes,
+    ..._levels.map((level) => level.index),
+  ];
+
+  static ChorusCheckpoint? fromRecord(Object? value) {
+    if (value is! List ||
+        value.length != 6 ||
+        value.any((item) => item is! int)) {
+      return null;
+    }
+    final values = value.cast<int>();
+    final chorus = values[0];
+    if (chorus < 1 ||
+        chorus > _choruses.length ||
+        values[1] != _choruses[chorus - 1].preview * _ticksPerSecond ||
+        values.skip(2).take(2).any((volume) => volume < 0 || volume > 100) ||
+        values
+            .skip(4)
+            .any((level) => level < 0 || level >= CrowdStatus.singing.index)) {
+      return null;
+    }
+    return ChorusCheckpoint._(
+      chorus,
+      values[1],
+      values.sublist(2, 4),
+      values.skip(4).map((level) => CrowdStatus.values[level]).toList(),
+    );
+  }
+}
+
+class ChorusResult {
+  ChorusResult._(this.checkpoint, this.score, List<int> beats)
+    : _beats = List.unmodifiable(beats);
+
+  final ChorusCheckpoint checkpoint;
+  final int score;
+  final List<int> _beats;
+
+  int get chorus => checkpoint.chorus;
+  int get beatCount => _beats.length;
+  bool sangAt(FestivalZone zone, int beat) =>
+      _beats[beat] & (1 << zone.index) != 0;
+  int? firstBeat(FestivalZone zone) {
+    final index = _beats.indexWhere((beat) => beat & (1 << zone.index) != 0);
+    return index < 0 ? null : index + 1;
+  }
+
+  int get togetherBeats => _beats.where((beat) => beat == 3).length;
+}
+
 class _Chorus {
   const _Chorus(this.number, this.preview, this.opens, this.closes, this.start);
 
@@ -27,7 +94,7 @@ const _choruses = [
 
 /// Deterministic 120 BPM festival simulation shared by audio-free UI states.
 class FestivalPerformance {
-  FestivalPerformance({this.practiceChorus})
+  FestivalPerformance({this.practiceChorus, this.mastery = false})
     : assert(
         practiceChorus == null || (practiceChorus >= 1 && practiceChorus <= 3),
       ),
@@ -39,14 +106,36 @@ class FestivalPerformance {
     }
     if (practiceChorus == 3) _volumes[FestivalZone.front.index] = 35;
     _refreshLevels();
+    if (practiceChorus != null) _saveCheckpoint(practiceChorus!);
+  }
+
+  factory FestivalPerformance.replay(
+    ChorusCheckpoint checkpoint, {
+    bool mastery = false,
+  }) {
+    assert(!mastery || checkpoint.chorus == 3);
+    final performance = FestivalPerformance(
+      practiceChorus: checkpoint.chorus,
+      mastery: mastery,
+    );
+    performance._tick = checkpoint.tick;
+    performance._volumes.setAll(0, checkpoint._volumes);
+    performance._levels.setAll(0, checkpoint._levels);
+    performance._checkpoints[checkpoint.chorus - 1] = checkpoint;
+    return performance;
   }
 
   final int? practiceChorus;
+  final bool mastery;
+  int get _generatorEnd =>
+      _generatorStopTick + (mastery ? 2 * _ticksPerBeat : 0);
   int _tick;
   final _volumes = [50, 40];
   final _levels = [CrowdStatus.quiet, CrowdStatus.quiet];
   final _singing = [false, false];
   final _halfPoints = [0, 0, 0];
+  final _checkpoints = List<ChorusCheckpoint?>.filled(3, null);
+  final _chorusBeats = List.generate(3, (_) => <int>[]);
   FestivalZone? _reserved;
   int? _reservedTick;
   bool _signalSucceeded = false;
@@ -60,13 +149,22 @@ class FestivalPerformance {
   int get score => _halfPoints.reduce((a, b) => a + b) ~/ 2;
   List<int> get chorusScores =>
       _halfPoints.map((points) => points ~/ 2).toList(growable: false);
+  ChorusResult chorusResult(int chorus) {
+    final i = chorus - 1;
+    return ChorusResult._(
+      _checkpoints[i]!,
+      _halfPoints[i] ~/ 2,
+      _chorusBeats[i],
+    );
+  }
+
   int get maximum => practiceChorus == null ? 90 : 30;
   bool get finished =>
       _tick >=
       (practiceChorus == null ? 100 : _choruses[practiceChorus! - 1].end) *
           _ticksPerSecond;
   bool get generatorRunning =>
-      _tick >= 76 * _ticksPerSecond && _tick < _generatorStopTick;
+      _tick >= 76 * _ticksPerSecond && _tick < _generatorEnd;
   bool get signalQueued => _reservedTick != null && _tick < _reservedTick!;
   bool get waveTowardBack => _waveTowardBack;
   int? get waveFrame {
@@ -113,13 +211,13 @@ class FestivalPerformance {
     final due = switch (seconds) {
       >= 46 && < 48 => ('앞줄 관객 접근', 48 * _ticksPerSecond),
       >= 74 && < 76 => ('발전기 가동', 76 * _ticksPerSecond),
-      >= 76 && < 80 => ('발전기 정지', _generatorStopTick),
+      >= 76 && < 81 => ('발전기 정지', _generatorEnd),
       _ => null,
     };
     if (due != null && _tick < due.$2) {
       return (due.$1, (due.$2 - _tick + _ticksPerBeat - 1) ~/ _ticksPerBeat);
     }
-    if (seconds >= 79 && seconds < 82) return ('발전기 정지 완료', null);
+    if (_tick >= _generatorEnd && seconds < 82) return ('발전기 정지 완료', null);
     if (seconds >= 48 && seconds < 50) return ('앞줄 체감 볼륨 증가', null);
     final chorus = _chorusAt(_tick);
     if (chorus != null && _isOpen(chorus)) {
@@ -189,8 +287,22 @@ class FestivalPerformance {
         _levels.fillRange(0, 2, CrowdStatus.quiet);
       }
       _refreshLevels();
+      if (current != null &&
+          current.number != 0 &&
+          _tick == current.preview * _ticksPerSecond) {
+        _saveCheckpoint(current.number);
+      }
       if (current != null) _applyBeat(current);
     }
+  }
+
+  void _saveCheckpoint(int chorus) {
+    _checkpoints[chorus - 1] = ChorusCheckpoint._(
+      chorus,
+      _tick,
+      _volumes,
+      _levels,
+    );
   }
 
   void _awardPreviousBeat(_Chorus? chorus) {
@@ -200,7 +312,9 @@ class FestivalPerformance {
         beatStart >= chorus.end * _ticksPerSecond) {
       return;
     }
-    _halfPoints[chorus.number - 1] +=
+    final index = chorus.number - 1;
+    _chorusBeats[index].add((_singing[0] ? 1 : 0) | (_singing[1] ? 2 : 0));
+    _halfPoints[index] +=
         (_singing[0] ? 1 : 0) +
         (_singing[1] ? 1 : 0) +
         (_singing.every((value) => value) ? 1 : 0);

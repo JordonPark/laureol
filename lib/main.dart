@@ -3,12 +3,21 @@ import 'dart:async';
 // Retain the SDK widgets while this prototype has no external UI dependencies.
 // ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'chorus_summary.dart';
 import 'festival_performance.dart';
+import 'festival_records.dart';
 import 'festival_scene.dart';
 import 'performance_controls.dart';
 
-void main() => runApp(const LaureolApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    LaureolApp(records: FestivalRecords(await SharedPreferences.getInstance())),
+  );
+}
 
 const _night = Color(0xFF171329);
 const _paper = Color(0xFFF7F2FF);
@@ -31,13 +40,15 @@ Future<void> _open(
 }
 
 class LaureolApp extends StatelessWidget {
-  const LaureolApp({super.key});
+  const LaureolApp({super.key, required this.records});
+
+  final FestivalRecords records;
 
   @override
   Widget build(BuildContext context) {
-    return const CupertinoApp(
+    return CupertinoApp(
       title: '라우럴! 볼륨 좀 올려',
-      theme: CupertinoThemeData(
+      theme: const CupertinoThemeData(
         brightness: Brightness.dark,
         primaryColor: _gold,
         scaffoldBackgroundColor: _night,
@@ -47,7 +58,7 @@ class LaureolApp extends StatelessWidget {
           textStyle: TextStyle(color: _paper, fontSize: 16),
         ),
       ),
-      home: _StartScreen(),
+      home: _StartScreen(records: records),
     );
   }
 }
@@ -134,16 +145,10 @@ class _StageArt extends StatelessWidget {
   }
 }
 
-class _StartScreen extends StatefulWidget {
-  const _StartScreen();
+class _StartScreen extends StatelessWidget {
+  const _StartScreen({required this.records});
 
-  @override
-  State<_StartScreen> createState() => _StartScreenState();
-}
-
-class _StartScreenState extends State<_StartScreen> {
-  double _volume = 70;
-  bool _vibration = true;
+  final FestivalRecords records;
 
   @override
   Widget build(BuildContext context) {
@@ -161,31 +166,42 @@ class _StartScreenState extends State<_StartScreen> {
         ),
         _Action(
           '공연 시작',
-          () => _open(context, const _SelectionScreen()),
+          () => _open(context, _SelectionScreen(records: records)),
           primary: true,
         ),
-        _Action(
-          '설정',
-          () => _open(
-            context,
-            _SettingsScreen(
-              volume: _volume,
-              vibration: _vibration,
-              onVolumeChanged: (value) => _volume = value,
-              onVibrationChanged: (value) => _vibration = value,
-            ),
-          ),
-        ),
+        _Action('설정', () => _open(context, _SettingsScreen(records: records))),
       ],
     );
   }
 }
 
-class _SelectionScreen extends StatelessWidget {
-  const _SelectionScreen();
+class _SelectionScreen extends StatefulWidget {
+  const _SelectionScreen({required this.records});
+
+  final FestivalRecords records;
+
+  @override
+  State<_SelectionScreen> createState() => _SelectionScreenState();
+}
+
+class _SelectionScreenState extends State<_SelectionScreen> {
+  Future<void> _play({ChorusCheckpoint? checkpoint}) async {
+    await _open(
+      context,
+      _PerformanceScreen(
+        records: widget.records,
+        checkpoint: checkpoint,
+        mastery: checkpoint != null,
+        previousScore: checkpoint == null ? null : widget.records.masteryBest,
+      ),
+    );
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
+    final best = widget.records.concertBest;
+    final masteryBest = widget.records.masteryBest;
     return _Screen(
       title: '공연 선택',
       children: [
@@ -195,21 +211,31 @@ class _SelectionScreen extends StatelessWidget {
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
         ),
         const Text('약 100초 · 후렴 3개', style: TextStyle(color: _muted)),
-        _Action(
-          '동네 축제 시작',
-          () => _open(context, const _PerformanceScreen()),
-          primary: true,
-        ),
+        if (best != null) Text('일반 공연 최고 기록 ${best.score}/90'),
+        _Action('동네 축제 시작', () => _play(), primary: true),
+        if (best != null) ...[
+          if (masteryBest != null) Text('숙련 후렴 최고 기록 $masteryBest/30'),
+          _Action('숙련 후렴 도전', () => _play(checkpoint: best.checkpoint)),
+        ],
       ],
     );
   }
 }
 
 class _PerformanceScreen extends StatefulWidget {
-  const _PerformanceScreen({this.chorus, this.previousScore});
+  const _PerformanceScreen({
+    required this.records,
+    this.checkpoint,
+    this.previousScore,
+    this.previousResult,
+    this.mastery = false,
+  });
 
-  final int? chorus;
+  final FestivalRecords records;
+  final ChorusCheckpoint? checkpoint;
   final int? previousScore;
+  final ChorusResult? previousResult;
+  final bool mastery;
 
   @override
   State<_PerformanceScreen> createState() => _PerformanceScreenState();
@@ -222,11 +248,58 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   late FestivalPerformance _performance;
   Timer? _clock;
   bool _pauseOpen = false;
+  bool _openingResults = false;
+  Future<bool>? _savingResult;
+
+  FestivalPerformance _newPerformance() {
+    final checkpoint = widget.checkpoint;
+    return checkpoint == null
+        ? FestivalPerformance()
+        : FestivalPerformance.replay(checkpoint, mastery: widget.mastery);
+  }
+
+  Future<bool> _saveResult() async {
+    try {
+      return await widget.records.record(_performance);
+    } on Exception {
+      return false;
+    }
+  }
+
+  Future<void> _showResults() async {
+    if (_openingResults) return;
+    _openingResults = true;
+    final saved = await (_savingResult ??= _saveResult());
+    if (!mounted) return;
+    final checkpoint = widget.checkpoint;
+    await _open(
+      context,
+      checkpoint == null
+          ? _ResultsScreen(
+              records: widget.records,
+              score: _performance.score,
+              results: [
+                for (var chorus = 1; chorus <= 3; chorus++)
+                  _performance.chorusResult(chorus),
+              ],
+              saved: saved,
+            )
+          : _PracticeResultsScreen(
+              records: widget.records,
+              result: _performance.chorusResult(checkpoint.chorus),
+              previous: widget.previousScore,
+              previousResult: widget.previousResult,
+              mastery: widget.mastery,
+              saved: saved,
+            ),
+      replace: true,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    _performance = FestivalPerformance(practiceChorus: widget.chorus);
+    _performance = _newPerformance();
     WidgetsBinding.instance.addObserver(this);
     _resumeScene();
   }
@@ -257,6 +330,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       if (_performance.finished) {
         timer.cancel();
         _clock = null;
+        _savingResult = _saveResult();
       }
     });
   }
@@ -281,7 +355,11 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
           ),
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(dialog, _PauseAction.exit),
-            child: Text(widget.chorus == null ? '공연 선택으로' : '전체 결과로'),
+            child: Text(
+              widget.checkpoint == null || widget.mastery
+                  ? '공연 선택으로'
+                  : '전체 결과로',
+            ),
           ),
         ],
       ),
@@ -294,7 +372,8 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     }
     if (action == _PauseAction.restart) {
       setState(() {
-        _performance = FestivalPerformance(practiceChorus: widget.chorus);
+        _performance = _newPerformance();
+        _savingResult = null;
       });
     }
     if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed ||
@@ -305,7 +384,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
 
   @override
   Widget build(BuildContext context) {
-    final chorus = widget.chorus;
+    final chorus = widget.checkpoint?.chorus;
     final performance = _performance;
     final notice = performance.eventNotice;
     ZoneControlCard card(FestivalZone zone, String label) => ZoneControlCard(
@@ -315,13 +394,23 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       onVolumeChanged: (value) =>
           setState(() => performance.setVolume(zone, value)),
       signalState: performance.signal(zone),
-      onSignal: () => setState(() => performance.queue(zone)),
+      onSignal: () {
+        if (performance.signal(zone) != SignalState.available) return;
+        setState(() => performance.queue(zone));
+        if (widget.records.vibration) {
+          unawaited(HapticFeedback.selectionClick());
+        }
+      },
     );
     final front = card(FestivalZone.front, '앞줄');
     final back = card(FestivalZone.back, '뒷줄');
 
     return _Screen(
-      title: chorus == null ? '동네 축제 공연' : '후렴 $chorus 연습',
+      title: chorus == null
+          ? '동네 축제 공연'
+          : widget.mastery
+          ? '숙련 후렴 도전'
+          : '후렴 $chorus 연습',
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
         minimumSize: const Size(48, 40),
@@ -363,35 +452,24 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
             );
           },
         ),
-        if (performance.finished)
-          _Action(
-            '결과 보기',
-            () => _open(
-              context,
-              chorus == null
-                  ? _ResultsScreen(
-                      score: performance.score,
-                      chorusScores: performance.chorusScores,
-                    )
-                  : _PracticeResultsScreen(
-                      chorus: chorus,
-                      score: performance.score,
-                      previous: widget.previousScore,
-                    ),
-              replace: true,
-            ),
-            primary: true,
-          ),
+        if (performance.finished) _Action('결과 보기', _showResults, primary: true),
       ],
     );
   }
 }
 
 class _ResultsScreen extends StatelessWidget {
-  const _ResultsScreen({required this.score, required this.chorusScores});
+  const _ResultsScreen({
+    required this.records,
+    required this.score,
+    required this.results,
+    required this.saved,
+  });
 
+  final FestivalRecords records;
   final int score;
-  final List<int> chorusScores;
+  final List<ChorusResult> results;
+  final bool saved;
 
   @override
   Widget build(BuildContext context) {
@@ -399,17 +477,29 @@ class _ResultsScreen extends StatelessWidget {
       title: '전체 결과',
       children: [
         PerformanceScore(score: score),
-        for (var i = 0; i < chorusScores.length; i++)
+        if (!saved) const Text('최고 기록을 저장하지 못했어요.'),
+        for (final result in results) ...[
           _Action(
-            '후렴 ${i + 1} 연습 · ${chorusScores[i]}/30',
+            '후렴 ${result.chorus} 연습 · ${result.score}/30',
             () => _open(
               context,
-              _PerformanceScreen(chorus: i + 1, previousScore: chorusScores[i]),
+              _PerformanceScreen(
+                records: records,
+                checkpoint: result.checkpoint,
+                previousScore: result.score,
+                previousResult: result,
+              ),
             ),
           ),
+          ChorusSummary(result: result),
+        ],
         _Action(
           '공연 다시 하기',
-          () => _open(context, const _PerformanceScreen(), replace: true),
+          () => _open(
+            context,
+            _PerformanceScreen(records: records),
+            replace: true,
+          ),
           primary: true,
         ),
         _Action('공연 선택으로', () => Navigator.of(context).pop()),
@@ -420,66 +510,89 @@ class _ResultsScreen extends StatelessWidget {
 
 class _PracticeResultsScreen extends StatelessWidget {
   const _PracticeResultsScreen({
-    required this.chorus,
-    required this.score,
+    required this.records,
+    required this.result,
     this.previous,
+    this.previousResult,
+    required this.mastery,
+    required this.saved,
   });
 
-  final int score;
+  final FestivalRecords records;
+  final ChorusResult result;
   final int? previous;
-
-  final int chorus;
+  final ChorusResult? previousResult;
+  final bool mastery;
+  final bool saved;
 
   @override
   Widget build(BuildContext context) {
     return _Screen(
-      title: '후렴 연습 결과',
+      title: mastery ? '숙련 후렴 결과' : '후렴 연습 결과',
       children: [
         Text(
-          '후렴 $chorus',
+          '후렴 ${result.chorus}',
           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
-        PerformanceScore(score: score, maximum: 30),
+        PerformanceScore(score: result.score, maximum: 30),
         if (previous != null)
           Text(
-            '이전 $previous점 → $score점',
+            '이전 $previous점 → ${result.score}점',
             style: const TextStyle(color: _muted),
           ),
+        if (!saved) const Text('최고 기록을 저장하지 못했어요.'),
+        if (previousResult != null) ...[
+          const Text('이전 떼창 기록'),
+          ChorusSummary(result: previousResult!),
+          const Text('이번 떼창 기록'),
+        ],
+        ChorusSummary(result: result),
         _Action(
           '이 후렴 다시 연습',
           () => _open(
             context,
-            _PerformanceScreen(chorus: chorus, previousScore: score),
+            _PerformanceScreen(
+              records: records,
+              checkpoint: result.checkpoint,
+              previousScore: result.score,
+              previousResult: result,
+              mastery: mastery,
+            ),
             replace: true,
           ),
           primary: true,
         ),
-        _Action('전체 결과로', () => Navigator.of(context).pop()),
+        _Action(
+          mastery ? '공연 선택으로' : '전체 결과로',
+          () => Navigator.of(context).pop(),
+        ),
       ],
     );
   }
 }
 
 class _SettingsScreen extends StatefulWidget {
-  const _SettingsScreen({
-    required this.volume,
-    required this.vibration,
-    required this.onVolumeChanged,
-    required this.onVibrationChanged,
-  });
+  const _SettingsScreen({required this.records});
 
-  final double volume;
-  final bool vibration;
-  final ValueChanged<double> onVolumeChanged;
-  final ValueChanged<bool> onVibrationChanged;
+  final FestivalRecords records;
 
   @override
   State<_SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<_SettingsScreen> {
-  late int _volume = widget.volume.round();
-  late bool _vibration = widget.vibration;
+  late int _volume = widget.records.volume;
+  late bool _vibration = widget.records.vibration;
+  bool _saveFailed = false;
+
+  Future<void> _save(Future<bool> operation) async {
+    try {
+      if (await operation) return;
+    } on Exception {
+      // Keep the setting usable for this session and surface the write failure.
+    }
+    if (mounted) setState(() => _saveFailed = true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -491,7 +604,7 @@ class _SettingsScreenState extends State<_SettingsScreen> {
           value: _volume,
           onChanged: (value) {
             setState(() => _volume = value);
-            widget.onVolumeChanged(value.toDouble());
+            unawaited(_save(widget.records.setVolume(value)));
           },
         ),
         Row(
@@ -503,13 +616,14 @@ class _SettingsScreenState extends State<_SettingsScreen> {
                 value: _vibration,
                 onChanged: (value) {
                   setState(() => _vibration = value);
-                  widget.onVibrationChanged(value);
+                  unawaited(_save(widget.records.setVibration(value)));
                 },
               ),
             ),
           ],
         ),
         const Text('공연은 소리를 꺼도 플레이할 수 있어요.', style: TextStyle(color: _muted)),
+        if (_saveFailed) const Text('설정을 저장하지 못했어요.'),
       ],
     );
   }
