@@ -67,31 +67,45 @@ class ZoneVolumeSlider extends StatelessWidget {
     required this.zone,
     required this.value,
     required this.onChanged,
+    this.enabled = true,
+    this.highlighted = false,
   }) : assert(value >= 0 && value <= 100);
 
   final String zone;
   final int value;
   final ValueChanged<int> onChanged;
+  final bool enabled;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       label: '$zone 볼륨',
       value: '$value%',
-      increasedValue: value < 100 ? '${(value + 5).clamp(0, 100)}%' : null,
-      decreasedValue: value > 0 ? '${(value - 5).clamp(0, 100)}%' : null,
+      enabled: enabled,
+      increasedValue: enabled && value < 100
+          ? '${(value + 5).clamp(0, 100)}%'
+          : null,
+      decreasedValue: enabled && value > 0
+          ? '${(value - 5).clamp(0, 100)}%'
+          : null,
       slider: true,
-      onIncrease: value < 100
+      onIncrease: enabled && value < 100
           ? () => onChanged((value + 5).clamp(0, 100))
           : null,
-      onDecrease: value > 0 ? () => onChanged((value - 5).clamp(0, 100)) : null,
+      onDecrease: enabled && value > 0
+          ? () => onChanged((value - 5).clamp(0, 100))
+          : null,
       child: ExcludeSemantics(
         child: Column(
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('볼륨', style: TextStyle(color: _muted)),
+                Text(
+                  '볼륨',
+                  style: TextStyle(color: highlighted ? _amber : _muted),
+                ),
                 Text('$value%', style: const TextStyle(color: _ink)),
               ],
             ),
@@ -112,11 +126,15 @@ class ZoneVolumeSlider extends StatelessWidget {
 
                   return GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTapDown: (details) => update(details.localPosition.dx),
-                    onHorizontalDragStart: (details) =>
-                        update(details.localPosition.dx),
-                    onHorizontalDragUpdate: (details) =>
-                        update(details.localPosition.dx),
+                    onTapDown: enabled
+                        ? (details) => update(details.localPosition.dx)
+                        : null,
+                    onHorizontalDragStart: enabled
+                        ? (details) => update(details.localPosition.dx)
+                        : null,
+                    onHorizontalDragUpdate: enabled
+                        ? (details) => update(details.localPosition.dx)
+                        : null,
                     child: Stack(
                       alignment: Alignment.centerLeft,
                       children: [
@@ -130,13 +148,25 @@ class ZoneVolumeSlider extends StatelessWidget {
                           left: thumb / 2,
                           width: filled,
                           height: 8,
-                          child: const ColoredBox(color: _mint),
+                          child: ColoredBox(
+                            color: highlighted
+                                ? _amber
+                                : enabled
+                                ? _mint
+                                : _muted,
+                          ),
                         ),
                         Positioned(
                           left: filled,
                           width: thumb,
                           height: thumb,
-                          child: const ColoredBox(color: _ink),
+                          child: ColoredBox(
+                            color: highlighted
+                                ? _amber
+                                : enabled
+                                ? _ink
+                                : _muted,
+                          ),
                         ),
                       ],
                     ),
@@ -446,6 +476,8 @@ class PerformanceScore extends StatelessWidget {
   }
 }
 
+enum ControlHighlight { volume, signal }
+
 class ZoneControlCard extends StatelessWidget {
   const ZoneControlCard({
     super.key,
@@ -456,6 +488,8 @@ class ZoneControlCard extends StatelessWidget {
     required this.signalState,
     this.onSignal,
     this.compact = false,
+    this.volumeEnabled = true,
+    this.highlight,
   });
 
   final String zone;
@@ -465,6 +499,8 @@ class ZoneControlCard extends StatelessWidget {
   final SignalState signalState;
   final VoidCallback? onSignal;
   final bool compact;
+  final bool volumeEnabled;
+  final ControlHighlight? highlight;
 
   @override
   Widget build(BuildContext context) {
@@ -472,7 +508,7 @@ class ZoneControlCard extends StatelessWidget {
       padding: EdgeInsets.all(compact ? 8 : 12),
       decoration: BoxDecoration(
         color: _panel,
-        border: Border.all(color: _line),
+        border: Border.all(color: highlight == null ? _line : _amber),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -493,6 +529,8 @@ class ZoneControlCard extends StatelessWidget {
             zone: zone,
             value: volume,
             onChanged: onVolumeChanged,
+            enabled: volumeEnabled,
+            highlighted: highlight == ControlHighlight.volume,
           ),
           SignalButton(state: signalState, onPressed: onSignal),
         ],

@@ -13,12 +13,74 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     records = FestivalRecords(await SharedPreferences.getInstance());
     await records.setVolume(0);
+    await records.completeRehearsal();
   });
 
   testWidgets('Shows the game title on launch', (tester) async {
     await tester.pumpWidget(LaureolApp(records: records));
 
-    expect(find.text('라우럴! 볼륨 좀 올려'), findsOneWidget);
+    expect(find.bySemanticsLabel('라우럴! 볼륨 좀 올려'), findsOneWidget);
+  });
+
+  testWidgets('First rehearsal waits for the highlighted slider and signal', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final firstRun = FestivalRecords(await SharedPreferences.getInstance());
+    await firstRun.setVolume(0);
+    await tester.binding.setSurfaceSize(const Size(390, 740));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(LaureolApp(records: firstRun));
+    await tester.tap(find.text('공연 시작'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('리허설 시작'));
+    await tester.pumpAndSettle();
+
+    FestivalScene scene() =>
+        tester.widget<FestivalScene>(find.byType(FestivalScene));
+    final front = find.byType(ZoneVolumeSlider).first;
+    final rear = find.byType(ZoneVolumeSlider).last;
+    expect(scene().tick, 0);
+    expect(find.text('1/2 볼륨 조절'), findsOneWidget);
+    expect(tester.widget<ZoneVolumeSlider>(front).enabled, isFalse);
+    expect(tester.widget<ZoneVolumeSlider>(rear).highlighted, isTrue);
+    await tester.pump(const Duration(seconds: 25));
+    expect(scene().tick, 0);
+
+    final rearTrack = find.descendant(
+      of: rear,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is GestureDetector && widget.onHorizontalDragUpdate != null,
+      ),
+    );
+    await tester.tapAt(tester.getCenter(rearTrack));
+    await tester.pump();
+    expect(find.text('2/2 신호 보내기'), findsOneWidget);
+    expect(find.text('라우럴!'), findsOneWidget);
+    expect(scene().tick, 112);
+    await tester.pump(const Duration(seconds: 25));
+    expect(scene().tick, 112);
+
+    await tester.tap(find.text('라우럴!'));
+    await tester.pump(const Duration(seconds: 2));
+    expect(scene().back, CrowdStatus.singing);
+    expect(scene().front, CrowdStatus.singing);
+    await tester.pump(const Duration(seconds: 4));
+    expect(firstRun.rehearsalCompleted, isTrue);
+    expect(find.text('동네 축제 공연'), findsOneWidget);
+    expect(tester.widget<ZoneVolumeSlider>(rear).value, 50);
+    expect(tester.widget<ZoneVolumeSlider>(front).enabled, isTrue);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(LaureolApp(records: firstRun));
+    await tester.tap(find.text('공연 시작'));
+    await tester.pumpAndSettle();
+    expect(find.text('리허설 시작'), findsNothing);
+    await tester.tap(find.text('동네 축제 시작'));
+    await tester.pumpAndSettle();
+    expect(scene().tick, greaterThanOrEqualTo(160));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Combo reconnect animates in place and respects reduced motion', (
@@ -93,7 +155,6 @@ void main() {
 
       await tester.tap(find.text('공연 시작'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('두 줄이 함께 부르면 콤보가 이어져요'), findsOneWidget);
       final start = find.text('동네 축제 시작');
       expect(start.hitTestable(), findsOneWidget);
       await tester.tap(start);
@@ -102,7 +163,7 @@ void main() {
       final safeBounds = padding.deflateRect(Offset.zero & size);
       final cards = find.byType(ZoneControlCard);
       expect(cards, findsNWidgets(2));
-      expect(find.textContaining('뒷줄 볼륨을 밀어 ✓ 준비에 맞춰요'), findsOneWidget);
+      expect(find.textContaining('첫 후렴 · 두 줄을 ✓ 준비에 맞춰요'), findsOneWidget);
       for (final target in [
         find.byType(FestivalScene),
         cards.first,

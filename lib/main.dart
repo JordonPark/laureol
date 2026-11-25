@@ -26,7 +26,7 @@ const _paper = Color(0xFFF7F2FF);
 const _muted = Color(0xFFBDB8CD);
 const _gold = Color(0xFFFFC46A);
 const _uiFont = 'Laureol Sans';
-const _stage = 'docs/art/festival/stage.png';
+const _titleArt = 'docs/art/festival/title-festival.png';
 const _playGuide =
     '볼륨을 밀어 앞줄·뒷줄을 ✓ 준비에 맞춰요.\n'
     '노란 ‘라우럴!’ 버튼이 뜨면 준비된 한쪽을 눌러요.\n'
@@ -191,18 +191,15 @@ class _StageArt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF24203A),
-        border: Border.all(color: const Color(0xFF514866)),
-        borderRadius: BorderRadius.circular(14),
-      ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
       child: Image.asset(
-        _stage,
+        _titleArt,
+        width: double.infinity,
         height: math.min(height, MediaQuery.sizeOf(context).height * .25),
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.none,
-        semanticLabel: '해 질 녘 동네 축제 도트 무대',
+        fit: BoxFit.cover,
+        alignment: const Alignment(0, .12),
+        excludeFromSemantics: true,
       ),
     );
   }
@@ -215,26 +212,183 @@ class _StartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Screen(
-      title: '라우럴!',
-      compact: MediaQuery.sizeOf(context).height < 480,
-      children: [
-        const _StageArt(height: 220),
-        const Text(
-          '라우럴! 볼륨 좀 올려',
-          style: TextStyle(
-            color: _paper,
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        _Action(
-          '공연 시작',
-          () => _open(context, _SelectionScreen(records: records)),
-          primary: true,
-        ),
-        _Action('설정', () => _open(context, _SettingsScreen(records: records))),
-      ],
+    return CupertinoPageScaffold(
+      backgroundColor: _night,
+      child: LayoutBuilder(
+        builder: (context, viewport) {
+          final wide =
+              viewport.maxWidth >= 570 &&
+              viewport.maxWidth > viewport.maxHeight;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                left: wide ? viewport.maxWidth * .36 : 0,
+                child: Image.asset(
+                  _titleArt,
+                  fit: BoxFit.cover,
+                  alignment: wide ? const Alignment(0, .12) : Alignment.center,
+                  excludeFromSemantics: true,
+                ),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: wide
+                      ? const LinearGradient(
+                          colors: [_night, _night, Color(0x00171329)],
+                          stops: [0, .31, .62],
+                        )
+                      : const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0xA0161329),
+                            Color(0x00171329),
+                            Color(0xD9171329),
+                          ],
+                          stops: [0, .38, 1],
+                        ),
+                ),
+              ),
+              SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, safe) {
+                    final width = wide
+                        ? safe.maxWidth * .51
+                        : math.min(safe.maxWidth, 480.0);
+                    final inset = (width * .065).clamp(16.0, 28.0);
+                    final headline = ((width - inset * 2) * .20).clamp(
+                      42.0,
+                      74.0,
+                    );
+                    const top = 12.0;
+                    const bottom = 18.0;
+                    return Align(
+                      alignment: wide
+                          ? Alignment.centerLeft
+                          : Alignment.topCenter,
+                      child: SizedBox(
+                        width: width,
+                        child: SingleChildScrollView(
+                          padding: EdgeInsets.fromLTRB(
+                            inset,
+                            top,
+                            inset,
+                            bottom,
+                          ),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: math.max(
+                                0,
+                                safe.maxHeight - top - bottom,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: CupertinoButton(
+                                        color: const Color(0xA0171329),
+                                        borderRadius: BorderRadius.circular(6),
+                                        minimumSize: const Size(44, 44),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        onPressed: () => _open(
+                                          context,
+                                          _SettingsScreen(records: records),
+                                        ),
+                                        child: const Text(
+                                          '설정',
+                                          style: TextStyle(color: _paper),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(height: wide ? 16 : 20),
+                                    Text.rich(
+                                      TextSpan(
+                                        text: '라우럴!\n',
+                                        style: TextStyle(
+                                          color: _paper,
+                                          fontSize: headline,
+                                          height: 1,
+                                          fontWeight: FontWeight.w800,
+                                          shadows: const [
+                                            Shadow(
+                                              color: _night,
+                                              offset: Offset(3, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        children: [
+                                          TextSpan(
+                                            text: '볼륨 좀 올려',
+                                            style: TextStyle(
+                                              color: _gold,
+                                              fontSize: headline * .46,
+                                              height: 1.24,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      semanticsLabel: '라우럴! 볼륨 좀 올려',
+                                    ),
+                                  ],
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    top: wide ? 32 : 110,
+                                  ),
+                                  child: CupertinoButton(
+                                    color: _gold,
+                                    foregroundColor: _night,
+                                    minimumSize: const Size(48, 58),
+                                    borderRadius: BorderRadius.circular(8),
+                                    onPressed: () => _open(
+                                      context,
+                                      _SelectionScreen(records: records),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          CupertinoIcons.play_fill,
+                                          size: 16,
+                                        ),
+                                        SizedBox(width: 10),
+                                        Flexible(
+                                          child: Text(
+                                            '공연 시작',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -275,9 +429,14 @@ class _SelectionScreenState extends State<_SelectionScreen> {
           '동네 축제',
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
         ),
-        const Text('약 85초 · 후렴 3개', style: TextStyle(color: _muted)),
-        const Text(_playGuide, style: TextStyle(color: _paper, fontSize: 14)),
-        _Action('동네 축제 시작', () => _play(), primary: true),
+        const Text('후렴 3개', style: TextStyle(color: _muted)),
+        if (!widget.records.rehearsalCompleted)
+          const Text('첫 공연 전에 뒷줄 볼륨과 신호를 한 번씩 연습해요.'),
+        _Action(
+          widget.records.rehearsalCompleted ? '동네 축제 시작' : '리허설 시작',
+          () => _play(),
+          primary: true,
+        ),
         if (best != null) ...[
           Text('일반 공연 최고 기록 ${best.score}/90'),
           if (masteryBest != null) Text('숙련 후렴 최고 기록 $masteryBest/30'),
@@ -307,7 +466,9 @@ class _PerformanceScreen extends StatefulWidget {
   State<_PerformanceScreen> createState() => _PerformanceScreenState();
 }
 
-enum _PauseAction { resume, restart, exit }
+enum _PauseAction { resume, restart, skipRehearsal, exit }
+
+enum _RehearsalStep { volume, signal, response }
 
 class _PerformanceScreenState extends State<_PerformanceScreen>
     with WidgetsBindingObserver {
@@ -319,12 +480,56 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   bool _pauseOpen = false;
   bool _openingResults = false;
   Future<bool>? _savingResult;
+  _RehearsalStep? _rehearsalStep;
+
+  bool get _waitingForRehearsalInput =>
+      _rehearsalStep == _RehearsalStep.volume ||
+      _rehearsalStep == _RehearsalStep.signal;
 
   FestivalPerformance _newPerformance() {
     final checkpoint = widget.checkpoint;
-    return checkpoint == null
-        ? FestivalPerformance()
-        : FestivalPerformance.replay(checkpoint, mastery: widget.mastery);
+    if (checkpoint != null) {
+      return FestivalPerformance.replay(checkpoint, mastery: widget.mastery);
+    }
+    final guided = !widget.records.rehearsalCompleted;
+    _rehearsalStep = guided ? _RehearsalStep.volume : null;
+    final performance = FestivalPerformance(preserveRehearsalMix: guided);
+    if (!guided) performance.startMainConcert();
+    return performance;
+  }
+
+  Future<void> _rememberRehearsal() async {
+    try {
+      await widget.records.completeRehearsal();
+    } on Exception {
+      // A storage failure shouldn't interrupt the performance.
+    }
+  }
+
+  void _changeVolume(FestivalZone zone, int value) {
+    setState(() {
+      _performance.setVolume(zone, value);
+      if (_waitingForRehearsalInput && zone == FestivalZone.back) {
+        if (_performance.status(zone) == CrowdStatus.ready) {
+          _performance.openRehearsalSignal();
+          _rehearsalStep = _RehearsalStep.signal;
+        } else {
+          _rehearsalStep = _RehearsalStep.volume;
+        }
+      }
+    });
+    _updateAudio();
+  }
+
+  void _sendSignal(FestivalZone zone) {
+    if (_performance.signal(zone) != SignalState.available) return;
+    final rehearsing = _rehearsalStep == _RehearsalStep.signal;
+    setState(() {
+      _performance.queue(zone);
+      if (rehearsing) _rehearsalStep = _RehearsalStep.response;
+    });
+    if (widget.records.vibration) unawaited(HapticFeedback.selectionClick());
+    if (rehearsing) _resumeScene();
   }
 
   Future<bool> _saveResult() async {
@@ -400,7 +605,12 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   }
 
   void _resumeScene() {
-    if (_clock != null || _starting || _performance.finished) return;
+    if (_clock != null ||
+        _starting ||
+        _performance.finished ||
+        _waitingForRehearsalInput) {
+      return;
+    }
     final audio = _audio;
     if (audio == null) {
       _startClock();
@@ -438,10 +648,16 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     var previousTick = 0;
     _clock = Timer.periodic(festivalTick, (timer) {
       late final bool skipped;
+      late final bool rehearsalFinished;
       setState(() {
         _performance.advanceTicks(timer.tick - previousTick);
+        rehearsalFinished =
+            _rehearsalStep == _RehearsalStep.response &&
+            _performance.concertStarted;
+        if (rehearsalFinished) _rehearsalStep = null;
         skipped = _performance.advancePastInterlude();
       });
+      if (rehearsalFinished) unawaited(_rememberRehearsal());
       previousTick = timer.tick;
       if (_performance.finished) {
         _freezeScene();
@@ -473,6 +689,12 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
             onPressed: () => Navigator.pop(dialog, _PauseAction.restart),
             child: const Text('처음부터 다시'),
           ),
+          if (_rehearsalStep != null)
+            CupertinoDialogAction(
+              onPressed: () =>
+                  Navigator.pop(dialog, _PauseAction.skipRehearsal),
+              child: const Text('연습 건너뛰기'),
+            ),
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(dialog, _PauseAction.exit),
             child: Text(
@@ -496,6 +718,13 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         _savingResult = null;
       });
     }
+    if (action == _PauseAction.skipRehearsal) {
+      setState(() {
+        _rehearsalStep = null;
+        _performance.startMainConcert();
+      });
+      unawaited(_rememberRehearsal());
+    }
     if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed ||
         WidgetsBinding.instance.lifecycleState == null) {
       _resumeScene();
@@ -513,7 +742,23 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   Widget _buildPerformance(BuildContext context, BoxConstraints viewport) {
     final chorus = widget.checkpoint?.chorus;
     final performance = _performance;
-    final notice = performance.eventNotice;
+    final notice = switch (_rehearsalStep) {
+      _RehearsalStep.volume => (
+        performance.status(FestivalZone.back) == CrowdStatus.loud
+            ? '뒷줄 소리가 너무 커요. 볼륨을 조금 내려요.'
+            : '뒷줄 볼륨을 오른쪽으로 밀어 ✓ 준비에 맞춰요.',
+        null,
+      ),
+      _RehearsalStep.signal => ('좋아요! 뒷줄의 노란 ‘라우럴!’을 눌러요.', null),
+      _RehearsalStep.response => (
+        performance.status(FestivalZone.front) == CrowdStatus.singing &&
+                performance.status(FestivalZone.back) == CrowdStatus.singing
+            ? '두 줄이 함께 불러요! 곧 첫 후렴이 시작돼요.'
+            : '신호를 보냈어요. 관객 반응을 지켜봐요.',
+        null,
+      ),
+      null => performance.eventNotice,
+    };
     final media = MediaQuery.of(context);
     final safeWidth = viewport.maxWidth - media.padding.horizontal;
     final bodyHeight =
@@ -530,7 +775,9 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     final compact =
         standardText &&
         (sideBySide || safeWidth <= 380 || bodyHeight < fullSceneHeight + 390);
-    final title = chorus == null
+    final title = _rehearsalStep != null
+        ? '리허설'
+        : chorus == null
         ? '동네 축제 공연'
         : widget.mastery
         ? '숙련 후렴 도전'
@@ -540,24 +787,29 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       maximum: performance.maximum,
       compact: compact,
     );
-    ZoneControlCard card(FestivalZone zone, String label) => ZoneControlCard(
-      zone: label,
-      compact: compact,
-      status: performance.status(zone),
-      volume: performance.volume(zone),
-      onVolumeChanged: (value) {
-        setState(() => performance.setVolume(zone, value));
-        _updateAudio();
-      },
-      signalState: performance.signal(zone),
-      onSignal: () {
-        if (performance.signal(zone) != SignalState.available) return;
-        setState(() => performance.queue(zone));
-        if (widget.records.vibration) {
-          unawaited(HapticFeedback.selectionClick());
-        }
-      },
-    );
+    ZoneControlCard card(FestivalZone zone, String label) {
+      final back = zone == FestivalZone.back;
+      return ZoneControlCard(
+        zone: label,
+        compact: compact,
+        status: performance.status(zone),
+        volume: performance.volume(zone),
+        volumeEnabled: !_waitingForRehearsalInput || back,
+        highlight: back && _waitingForRehearsalInput
+            ? _rehearsalStep == _RehearsalStep.volume
+                  ? ControlHighlight.volume
+                  : ControlHighlight.signal
+            : null,
+        onVolumeChanged: (value) => _changeVolume(zone, value),
+        signalState:
+            !_waitingForRehearsalInput ||
+                (back && _rehearsalStep == _RehearsalStep.signal)
+            ? performance.signal(zone)
+            : SignalState.waiting,
+        onSignal: () => _sendSignal(zone),
+      );
+    }
+
     final front = card(FestivalZone.front, '앞줄');
     final back = card(FestivalZone.back, '뒷줄');
 
@@ -590,9 +842,15 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     final beats = BeatStrip(
       remaining: countdown?.remaining ?? performance.remainingBeats,
       total: countdown?.total ?? 6,
-      label: countdown == null
-          ? null
-          : '후렴 ${countdown.chorus} 신호까지 ${countdown.remaining}박',
+      label: switch (_rehearsalStep) {
+        _RehearsalStep.volume => '1/2 볼륨 조절',
+        _RehearsalStep.signal => '2/2 신호 보내기',
+        _RehearsalStep.response => '관객 반응 보기',
+        null =>
+          countdown == null
+              ? null
+              : '후렴 ${countdown.chorus} 신호까지 ${countdown.remaining}박',
+      },
       combo: performance.combo,
       holdingCombo: performance.holdingCombo,
     );

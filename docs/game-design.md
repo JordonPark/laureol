@@ -360,7 +360,22 @@
 
 ## 20. 첫 플레이 가능 버전 제작 명세
 
-첫 구현 범위는 **동네 축제 일반 공연 1개, 마지막 후렴 숙련 배치 1개, 결과 및 후렴 연습**이에요. 공연장 선택 화면에서 동네 축제를 시작하고, 약 84초 공연을 완주해 결과를 확인한 뒤 후렴 하나를 연습하는 흐름까지 연결해요. 라이브클럽과 야시장, 장비 및 고유 기술은 이 흐름을 검증한 뒤 제작해요.
+첫 구현 범위는 **동네 축제 일반 공연 1개, 마지막 후렴 숙련 배치 1개, 결과 및 후렴 연습**이에요. 첫 공연은 리허설에서 두 가지 조작을 직접 익힌 뒤 약 64초의 본 공연으로 이어져요. 라이브클럽과 야시장, 장비 및 고유 기술은 이 흐름을 검증한 뒤 제작해요.
+
+### 시작 화면과 첫 조작
+
+[타이틀 원화](art/festival/title-festival.png)를 화면 전체에 표시하고, 제목과 공연 시작 버튼은 iPhone 안전 영역 안에서 따로 배치해요. 처음에는 공연 선택 화면의 **리허설 시작**이 첫 조작으로 이어져요.
+
+1. 뒷줄 슬라이더만 강조해요. 관객 표시가 **✓ 준비**가 될 때까지 시간이 흐르지 않아요. 너무 높이면 안내가 볼륨을 내리라고 바뀌어요.
+2. 준비가 되면 뒷줄의 **라우럴!** 버튼이 켜져요. 누를 때까지 기다리고, 누르면 두 구역의 떼창을 보여줘요.
+3. 뒷줄에서 맞춘 볼륨을 가지고 본 공연으로 들어가요. 완료를 기기에 저장해 다음 일반 공연부터 바로 무대를 시작해요. 일시정지에서 리허설을 건너뛸 수 있어요.
+
+<details>
+<summary>내장 이미지 생성 도구의 타이틀 원화 프롬프트</summary>
+
++> Use case: stylized-concept. Asset: portrait 9:16, full-bleed title background for the original Korean 2.5D pixel-art festival sound-mixing game Laureol. Build a joyful neighborhood outdoor gig at blue hour, in crisp 16-bit game pixel art with consistent visible square pixels, warm amber spotlights, deep ink-violet shadows and small teal tones. A temporary festival stage with a charcoal blue canopy, copper-colored roof edge and golden festoon bulbs, one singer with a microphone, one musician, two chunky black speaker stacks, and a crowd seen mostly from behind. Use an elevated three-quarter view with readable stage silhouette, substantial middle foreground crowd depth, and an intimate street-festival mood. Place the stage and crowd within the middle 52 percent in height and center 76 percent in width, with the stage canopy beginning roughly 31 percent down. Make the top quarter a quiet dark violet sky for an editable Korean title and the bottom fifth a dark foreground for an editable start button. Polish the lighting and silhouettes like real shipped game title art. Hard-edged pixel clusters; no 3D render, vector outlines, photographic blur, text, letters, numbers, logos, borders, cards, buttons, iconography, or UI.
+
+</details>
 
 ### 20.1 공연 타임라인
 
@@ -368,8 +383,8 @@
 
 | 시간 | 사건 | 화면 및 판정 |
 |---|---|---|
-| 0–10초 | 뒷줄 볼륨 연습 | 기본 볼륨으로 시작해 뒷줄 카드를 안내해요. 뒷줄이 적정 범위에 들어오면 안내가 사라져요. |
-| 10–20초 | 첫 신호 연습 | 14초에 연습 버튼을 보여주고 다음 박 예약을 경험하게 해요. 연습 입력과 점수는 20초에 초기화하고 앞줄 50, 뒷줄 40에서 본공연을 시작해요. |
+| 0초 / 14초 | 첫 볼륨과 신호 연습 | 0초에서 뒷줄을 맞출 때까지 기다려요. 준비가 되면 곡의 14초 지점에서 신호를 열고, 첫 탭 이후에 재생해요. |
+| 14–20초 | 관객 응답 | 두 구역이 따라 부르는 모습을 보여줘요. 첫 연습에서 맞춘 볼륨은 본 공연에 이어져요. 리허설을 이미 끝낸 플레이어는 기본 볼륨으로 20초부터 시작해요. |
 | 22–24초 | 첫 신호 구간 | 앞줄이 준비된 상태예요. 선행 신호는 22초에 표시하고, 첫 득점은 24초부터 시작해요. |
 | 24–34초 | 첫 후렴 득점 | 앞줄에서 시작하고 뒷줄을 맞추는 흐름을 시험해요. |
 | 34–38초 | 다음 후렴 준비 | 함께 부른 시간과 이어갈 콤보를 표시하고, 앞줄 관객이 가까워질 때의 볼륨을 미리 맞춰요. 38초에 46초 예고로 넘어가요. |

@@ -99,13 +99,16 @@ const _choruses = [
 
 /// Deterministic 120 BPM festival simulation shared by audio-free UI states.
 class FestivalPerformance {
-  FestivalPerformance({this.practiceChorus, this.mastery = false})
-    : assert(
-        practiceChorus == null || (practiceChorus >= 1 && practiceChorus <= 3),
-      ),
-      _tick = practiceChorus == null
-          ? 0
-          : _choruses[practiceChorus - 1].preview * _ticksPerSecond {
+  FestivalPerformance({
+    this.practiceChorus,
+    this.mastery = false,
+    this.preserveRehearsalMix = false,
+  }) : assert(
+         practiceChorus == null || (practiceChorus >= 1 && practiceChorus <= 3),
+       ),
+       _tick = practiceChorus == null
+           ? 0
+           : _choruses[practiceChorus - 1].preview * _ticksPerSecond {
     if (practiceChorus == 2 || practiceChorus == 3) {
       _volumes[FestivalZone.back.index] = 50;
     }
@@ -132,6 +135,7 @@ class FestivalPerformance {
 
   final int? practiceChorus;
   final bool mastery;
+  final bool preserveRehearsalMix;
   int get _generatorEnd =>
       _generatorStopTick + (mastery ? 2 * _ticksPerBeat : 0);
   int _tick;
@@ -156,6 +160,7 @@ class FestivalPerformance {
   int get tick => _tick;
   Duration get position => festivalTick * _tick;
   int get seconds => _tick ~/ _ticksPerSecond;
+  bool get concertStarted => _tick >= _choruses.first.preview * _ticksPerSecond;
   int get score => _halfPoints.reduce((a, b) => a + b) ~/ 2;
   int get combo => _combo;
   int get bestCombo => _bestCombo;
@@ -186,6 +191,18 @@ class FestivalPerformance {
       festivalTick * ((_tick - 76 * _ticksPerSecond) % (2 * _ticksPerSecond));
   bool get signalQueued => _reservedTick != null && _tick < _reservedTick!;
   bool get waveTowardBack => _waveTowardBack;
+
+  void openRehearsalSignal() {
+    if (practiceChorus != null) return;
+    final start = _rehearsal.opens * _ticksPerSecond;
+    if (_tick < start) advanceTicks(start - _tick);
+  }
+
+  void startMainConcert() {
+    if (practiceChorus != null || concertStarted) return;
+    advanceTicks(_choruses.first.preview * _ticksPerSecond - _tick);
+  }
+
   int? get waveFrame {
     final from = _waveTick;
     return from != null && _tick - from < _ticksPerBeat ? _tick - from : null;
@@ -285,6 +302,9 @@ class FestivalPerformance {
     }
     if (seconds >= 48 && seconds < 50) return ('앞줄 체감 볼륨 증가', null);
     final chorus = _chorusAt(_tick);
+    if (chorus != null && chorus.number == 1 && seconds < chorus.opens) {
+      return ('첫 후렴 · 두 줄을 ✓ 준비에 맞춰요', null);
+    }
     if (signalQueued) return ('신호 예약 · 박자에 맞춰 떼창이 시작돼요', null);
     if (chorus != null && _reserved == null && _isOpen(chorus)) {
       return ('노란 ‘라우럴!’ 버튼을 준비된 쪽에서 눌러요', null);
@@ -396,7 +416,9 @@ class FestivalPerformance {
       _awardPreviousBeat(previous);
       final current = _chorusAt(_tick);
       if (current != previous) _resetChorus();
-      if (_tick == 20 * _ticksPerSecond && practiceChorus == null) {
+      if (_tick == _choruses.first.preview * _ticksPerSecond &&
+          practiceChorus == null &&
+          !preserveRehearsalMix) {
         _volumes[0] = 50;
         _volumes[1] = 40;
         _levels.fillRange(0, 2, CrowdStatus.quiet);
