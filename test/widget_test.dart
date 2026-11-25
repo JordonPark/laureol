@@ -327,9 +327,10 @@ void main() {
       expect(sceneRect.top, greaterThanOrEqualTo(24));
       expect(sceneRect.bottom, lessThan(front.top));
       expect(front.top, back.top);
+      expect(front.size, back.size);
+      expect(front.width, front.height);
       final notes = tester.getRect(find.byType(BeatStrip));
-      expect(notes.left, greaterThan(front.right));
-      expect(notes.right, lessThan(back.left));
+      expect(notes.bottom, lessThan(front.top));
       expect(
         back.bottom,
         lessThan(tester.getRect(find.byType(SignalButton)).top),

@@ -284,7 +284,6 @@ class _VolumeDialGesture extends StatefulWidget {
 }
 
 class _VolumeDialGestureState extends State<_VolumeDialGesture> {
-  static const _height = 88.0;
   static const _pixelsPerPoint = 3.0;
 
   int _startVolume = 0;
@@ -305,8 +304,8 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
     _update(_startVolume + (_dragDistance / _pixelsPerPoint).round());
   }
 
-  void _tap(TapUpDetails details) {
-    final offset = details.localPosition.dy - _height / 2;
+  void _tap(TapUpDetails details, double height) {
+    final offset = details.localPosition.dy - height / 2;
     if (offset.abs() < 9) return;
     _update(widget.value + (offset < 0 ? 1 : -1));
     widget.onInteractionEnd?.call();
@@ -314,27 +313,36 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      dragStartBehavior: DragStartBehavior.down,
-      onTapUp: widget.enabled ? _tap : null,
-      onVerticalDragStart: widget.enabled ? _startDrag : null,
-      onVerticalDragUpdate: widget.enabled ? _drag : null,
-      onVerticalDragEnd: widget.enabled
-          ? (_) => widget.onInteractionEnd?.call()
-          : null,
-      child: SizedBox(
-        width: 76,
-        height: _height,
-        child: CustomPaint(
-          painter: _VolumeDialPainter(
-            value: widget.value,
-            band: widget.band,
-            highlighted: widget.highlighted,
-            enabled: widget.enabled,
+    return LayoutBuilder(
+      builder: (context, bounds) {
+        final side = math.min(
+          128.0,
+          math.min(bounds.maxWidth, bounds.maxHeight),
+        );
+        return Center(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            dragStartBehavior: DragStartBehavior.down,
+            onTapUp: widget.enabled ? (details) => _tap(details, side) : null,
+            onVerticalDragStart: widget.enabled ? _startDrag : null,
+            onVerticalDragUpdate: widget.enabled ? _drag : null,
+            onVerticalDragEnd: widget.enabled
+                ? (_) => widget.onInteractionEnd?.call()
+                : null,
+            child: SizedBox.square(
+              dimension: side,
+              child: CustomPaint(
+                painter: _VolumeDialPainter(
+                  value: widget.value,
+                  band: widget.band,
+                  highlighted: widget.highlighted,
+                  enabled: widget.enabled,
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -358,7 +366,8 @@ class _VolumeDialPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final origin = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - 6;
+    final radius = math.min(size.width, size.height) / 2 - 11;
+    if (radius <= 7) return;
     final ring = Rect.fromCircle(center: origin, radius: radius);
     final paint = Paint()
       ..style = PaintingStyle.stroke
@@ -902,44 +911,56 @@ class ZoneControlCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 88,
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xED24203A),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      foregroundDecoration: BoxDecoration(
-        border: Border.all(
-          color: status.color.withAlpha(selected || needsRescue ? 255 : 180),
-          width: 2,
+    return AspectRatio(
+      aspectRatio: 1,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xED24203A),
+          borderRadius: BorderRadius.circular(10),
         ),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            zone,
-            style: const TextStyle(
-              color: _ink,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+        foregroundDecoration: BoxDecoration(
+          border: Border.all(
+            color: status.color.withAlpha(selected || needsRescue ? 255 : 180),
+            width: 2,
+          ),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            Wrap(
+              spacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                Text(
+                  zone,
+                  style: const TextStyle(
+                    color: _ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  '$volume%',
+                  style: const TextStyle(color: _ink, fontSize: 13),
+                ),
+              ],
             ),
-          ),
-          Text('$volume%', style: const TextStyle(color: _ink, fontSize: 12)),
-          ZoneVolumeSlider(
-            zone: zone,
-            value: volume,
-            onChanged: onVolumeChanged,
-            highlighted: cue == MixCue.adjust,
-            target: target,
-            vertical: true,
-            enabled: enabled,
-            onInteractionEnd: onInteractionEnd,
-          ),
-          CrowdStatusBadge(status: status, compact: true),
-        ],
+            Expanded(
+              child: ZoneVolumeSlider(
+                zone: zone,
+                value: volume,
+                onChanged: onVolumeChanged,
+                highlighted: cue == MixCue.adjust,
+                target: target,
+                vertical: true,
+                enabled: enabled,
+                onInteractionEnd: onInteractionEnd,
+              ),
+            ),
+            CrowdStatusBadge(status: status, compact: true),
+          ],
+        ),
       ),
     );
   }

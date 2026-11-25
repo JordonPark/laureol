@@ -980,7 +980,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     );
     final knob = Align(
       alignment: Alignment.centerRight,
-      child: _volumeControl(FestivalZone.back),
+      child: SizedBox(width: 136, child: _volumeControl(FestivalZone.back)),
     );
     return _Screen(
       title: '리허설',
@@ -1032,10 +1032,13 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         safeWidth >= 600 &&
         viewport.maxWidth > viewport.maxHeight;
     final fullSceneHeight = (math.min(safeWidth, 520.0) - 32) * 324 / 360;
+    final mixerHeight = (math.min(safeWidth, 520.0) - 32) / 2;
     // Leave room for the score, rhythm cues, and shared signal button.
     final compact =
         standardText &&
-        (sideBySide || safeWidth <= 380 || bodyHeight < fullSceneHeight + 390);
+        (sideBySide ||
+            safeWidth <= 380 ||
+            bodyHeight < fullSceneHeight + mixerHeight + 225);
     final title = widget.recovery != null
         ? '콤보 복구 연습'
         : chorus == null
@@ -1070,7 +1073,10 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         ? Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: math.max(132, bodyHeight - (sideBySide ? 14 : 296)),
+                maxHeight: math.max(
+                  132,
+                  bodyHeight - (sideBySide ? 14 : mixerHeight + 208),
+                ),
               ),
               child: scene,
             ),
@@ -1097,34 +1103,21 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       beatPhase: performance.hasLiveRhythm ? performance.beatPhase : null,
       signalReady: signalZone != null,
     );
-    final frontKnob = _volumeControl(FestivalZone.front);
-    final backKnob = _volumeControl(FestivalZone.back);
-    final mixer = LayoutBuilder(
-      builder: (context, bounds) {
-        if (bounds.maxWidth < 284 ||
-            MediaQuery.textScalerOf(context).scale(14) > 20) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [frontKnob, backKnob],
-              ),
-              const SizedBox(height: 6),
-              beats,
-            ],
-          );
-        }
-        return Row(
+    final mixer = Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: sideBySide
+              ? math.max(176, (bodyHeight - 190) * 2 + 8)
+              : 520,
+        ),
+        child: Row(
           children: [
-            frontKnob,
+            Expanded(child: _volumeControl(FestivalZone.front)),
             const SizedBox(width: 8),
-            Expanded(child: beats),
-            const SizedBox(width: 8),
-            backKnob,
+            Expanded(child: _volumeControl(FestivalZone.back)),
           ],
-        );
-      },
+        ),
+      ),
     );
     return _Screen(
       title: title,
@@ -1160,6 +1153,8 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
                       children: [
                         cue,
                         const SizedBox(height: 6),
+                        beats,
+                        const SizedBox(height: 6),
                         mixer,
                         const SizedBox(height: 6),
                         signal,
@@ -1169,7 +1164,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
                 ],
               ),
             ]
-          : [stage, if (!compact) score, cue, mixer, signal],
+          : [stage, if (!compact) score, cue, beats, mixer, signal],
     );
   }
 }
