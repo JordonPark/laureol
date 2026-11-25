@@ -41,6 +41,38 @@ enum _Sprite {
     Rect.fromLTRB(47, 23, 509, 702),
     animated: true,
   ),
+  jacket('crowd/body-jacket', 1024, 1536, Rect.fromLTRB(288, 300, 722, 1296)),
+  sweater('crowd/body-sweater', 1199, 1312, Rect.fromLTRB(394, 225, 761, 1137)),
+  cap('crowd/head-cap', 1536, 1024, Rect.fromLTRB(349, 154, 1167, 875)),
+  beanie('crowd/head-beanie', 1312, 1199, Rect.fromLTRB(226, 207, 1089, 1000)),
+  sweaterCovering(
+    'crowd/sweater-cover-ears',
+    543,
+    724,
+    Rect.fromLTRB(118, 39, 394, 687),
+    animated: true,
+  ),
+  sweaterSinging(
+    'crowd/sweater-sing',
+    543,
+    724,
+    Rect.fromLTRB(82, 55, 455, 686),
+    animated: true,
+  ),
+  jacketCovering(
+    'crowd/jacket-cover-ears',
+    543,
+    724,
+    Rect.fromLTRB(118, 34, 400, 688),
+    animated: true,
+  ),
+  jacketSinging(
+    'crowd/jacket-sing',
+    543,
+    724,
+    Rect.fromLTRB(88, 57, 407, 683),
+    animated: true,
+  ),
   listening(
     'crowd/listen',
     543,
@@ -109,6 +141,7 @@ class FestivalScene extends StatefulWidget {
     required this.signalQueued,
     this.waveFrame,
     this.waveTowardBack = true,
+    this.compact = false,
   });
 
   final int tick;
@@ -118,6 +151,7 @@ class FestivalScene extends StatefulWidget {
   final bool signalQueued;
   final int? waveFrame;
   final bool waveTowardBack;
+  final bool compact;
 
   @override
   State<FestivalScene> createState() => _FestivalSceneState();
@@ -186,7 +220,7 @@ class _FestivalSceneState extends State<FestivalScene> {
       label: description,
       image: true,
       child: AspectRatio(
-        aspectRatio: 360 / 324,
+        aspectRatio: 360 / (widget.compact ? 265 : 324),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
           child: _failed
@@ -201,6 +235,7 @@ class _FestivalSceneState extends State<FestivalScene> {
                     signalQueued: widget.signalQueued,
                     waveFrame: widget.waveFrame,
                     waveTowardBack: widget.waveTowardBack,
+                    compact: widget.compact,
                   ),
                 ),
         ),
@@ -219,6 +254,7 @@ class _FestivalPainter extends CustomPainter {
     required this.signalQueued,
     required this.waveFrame,
     required this.waveTowardBack,
+    required this.compact,
   }) : images = Map.of(images);
 
   final Map<_Sprite, ui.Image> images;
@@ -229,8 +265,15 @@ class _FestivalPainter extends CustomPainter {
   final bool signalQueued;
   final int? waveFrame;
   final bool waveTowardBack;
+  final bool compact;
 
   final _nearest = Paint()..filterQuality = FilterQuality.none;
+
+  double _y(double y) {
+    if (!compact) return y;
+    if (y <= 178) return y * (135 / 178);
+    return 135 + (y - 178) * (130 / 146);
+  }
 
   void _draw(
     Canvas canvas,
@@ -251,14 +294,15 @@ class _FestivalPainter extends CustomPainter {
       crop.right * sx,
       crop.bottom * sy,
     );
-    final width = height * crop.width / crop.height;
+    final size = compact && base.dy <= 178 ? height * .77 : height;
+    final width = size * crop.width / crop.height;
     canvas.save();
-    canvas.translate(base.dx, base.dy);
+    canvas.translate(base.dx, _y(base.dy));
     if (mirror) canvas.scale(-1, 1);
     canvas.drawImageRect(
       image,
       source,
-      Rect.fromLTWH(-width / 2, -height, width, height),
+      Rect.fromLTWH(-width / 2, -size, width, size),
       _nearest,
     );
     canvas.restore();
@@ -268,8 +312,10 @@ class _FestivalPainter extends CustomPainter {
     Canvas canvas,
     CrowdStatus status,
     List<Offset> positions,
-    double height,
-  ) {
+    double height, {
+    required bool frontRow,
+    required Color zoneColor,
+  }) {
     final sprite = switch (status) {
       CrowdStatus.quiet => _Sprite.listening,
       CrowdStatus.ready => _Sprite.clapping,
@@ -277,18 +323,68 @@ class _FestivalPainter extends CustomPainter {
       CrowdStatus.singing => _Sprite.singing,
     };
     for (var i = 0; i < positions.length; i++) {
+      final position = positions[i];
+      final phase = (tick + (status == CrowdStatus.singing ? 0 : i)) % 4;
+      if (i == 1 || i == 2) {
+        final sweater = (i == 1) == frontRow;
+        final reaction = switch (status) {
+          CrowdStatus.loud =>
+            sweater ? _Sprite.sweaterCovering : _Sprite.jacketCovering,
+          CrowdStatus.singing =>
+            sweater ? _Sprite.sweaterSinging : _Sprite.jacketSinging,
+          CrowdStatus.quiet || CrowdStatus.ready => null,
+        };
+        if (reaction != null) {
+          _draw(
+            canvas,
+            reaction,
+            position,
+            height,
+            frame: phase,
+            mirror: !frontRow,
+          );
+          continue;
+        }
+        final bodyHeight = height * .68;
+        final bounce = phase == 1 || phase == 2 ? 2.0 : 0.0;
+        // Keep the neck and feet anchored as the two sprite layers move together.
+        _draw(
+          canvas,
+          sweater ? _Sprite.sweater : _Sprite.jacket,
+          position.translate(0, -bounce),
+          bodyHeight,
+        );
+        _draw(
+          canvas,
+          sweater ? _Sprite.cap : _Sprite.beanie,
+          position.translate(1, 3 - bodyHeight - bounce),
+          height * .34,
+        );
+        continue;
+      }
+      if (i == 0) {
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset(position.dx, _y(position.dy) + 1),
+            width: 30,
+            height: 8,
+          ),
+          Paint()..color = zoneColor.withAlpha(175),
+        );
+      }
       _draw(
         canvas,
         sprite,
-        positions[i],
-        height,
-        frame: (tick + (status == CrowdStatus.singing ? 0 : i % 2)) % 4,
+        position,
+        i == 0 ? height * 1.12 : height,
+        frame: phase,
         mirror: i.isOdd,
       );
     }
   }
 
   void _zoneLabel(Canvas canvas, String label, Color color, Offset offset) {
+    offset = Offset(offset.dx, _y(offset.dy));
     final text = TextPainter(
       text: TextSpan(
         text: label,
@@ -319,14 +415,15 @@ class _FestivalPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.scale(size.width / 360, size.height / 324);
-    const scene = Rect.fromLTWH(0, 0, 360, 324);
+    final height = compact ? 265.0 : 324.0;
+    canvas.scale(size.width / 360, size.height / height);
+    final scene = Rect.fromLTWH(0, 0, 360, height);
     canvas.drawRect(
       scene,
       Paint()
         ..shader = ui.Gradient.linear(
           const Offset(0, 0),
-          const Offset(0, 324),
+          Offset(0, height),
           const [Color(0xFF3D2F53), Color(0xFF211E34)],
         ),
     );
@@ -357,21 +454,28 @@ class _FestivalPainter extends CustomPainter {
     if (wave != null) {
       canvas.save();
       if (!waveTowardBack) {
-        canvas.translate(0, 463);
+        canvas.translate(0, _y(164) + _y(299));
         canvas.scale(1, -1);
       }
       _draw(canvas, _Sprite.wave, const Offset(168, 299), 129, frame: wave);
       canvas.restore();
     }
 
-    _crowd(canvas, front, const [
-      Offset(101, 210),
-      Offset(141, 203),
-      Offset(183, 203),
-      Offset(122, 230),
-      Offset(166, 230),
-      Offset(205, 225),
-    ], 53);
+    _crowd(
+      canvas,
+      front,
+      const [
+        Offset(101, 210),
+        Offset(141, 203),
+        Offset(183, 203),
+        Offset(122, 230),
+        Offset(166, 230),
+        Offset(205, 225),
+      ],
+      53,
+      frontRow: true,
+      zoneColor: const Color(0xFF7CE0C2),
+    );
     _draw(
       canvas,
       _Sprite.vendor,
@@ -391,16 +495,33 @@ class _FestivalPainter extends CustomPainter {
         frame: tick % 4,
       );
     }
-    _crowd(canvas, back, const [
-      Offset(93, 276),
-      Offset(145, 272),
-      Offset(191, 269),
-      Offset(111, 307),
-      Offset(160, 307),
-      Offset(213, 302),
-    ], 58);
-    _zoneLabel(canvas, '앞줄', const Color(0xFF7CE0C2), const Offset(15, 189));
-    _zoneLabel(canvas, '뒷줄', const Color(0xFFFFC46A), const Offset(15, 253));
+    _crowd(
+      canvas,
+      back,
+      const [
+        Offset(93, 276),
+        Offset(145, 272),
+        Offset(191, 269),
+        Offset(111, 307),
+        Offset(160, 307),
+        Offset(213, 302),
+      ],
+      58,
+      frontRow: false,
+      zoneColor: const Color(0xFFFFC46A),
+    );
+    _zoneLabel(
+      canvas,
+      '앞줄 ${front.symbol}',
+      const Color(0xFF7CE0C2),
+      const Offset(15, 189),
+    );
+    _zoneLabel(
+      canvas,
+      '뒷줄 ${back.symbol}',
+      const Color(0xFFFFC46A),
+      const Offset(15, 253),
+    );
     canvas.restore();
   }
 
@@ -413,5 +534,6 @@ class _FestivalPainter extends CustomPainter {
       generatorRunning != oldDelegate.generatorRunning ||
       waveFrame != oldDelegate.waveFrame ||
       waveTowardBack != oldDelegate.waveTowardBack ||
+      compact != oldDelegate.compact ||
       images.length != oldDelegate.images.length;
 }

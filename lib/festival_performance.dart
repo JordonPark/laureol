@@ -7,6 +7,8 @@ const _generatorStopTick = 79 * _ticksPerSecond + _ticksPerBeat;
 
 enum FestivalZone { front, back }
 
+enum FestivalCue { call, applause, singalong, generatorStop }
+
 class ChorusCheckpoint {
   ChorusCheckpoint._(
     this.chorus,
@@ -136,6 +138,7 @@ class FestivalPerformance {
   final _halfPoints = [0, 0, 0];
   final _checkpoints = List<ChorusCheckpoint?>.filled(3, null);
   final _chorusBeats = List.generate(3, (_) => <int>[]);
+  final _cues = <(FestivalCue, int)>[];
   FestivalZone? _reserved;
   int? _reservedTick;
   bool _signalSucceeded = false;
@@ -145,6 +148,7 @@ class FestivalPerformance {
   bool _waveTowardBack = true;
 
   int get tick => _tick;
+  Duration get position => festivalTick * _tick;
   int get seconds => _tick ~/ _ticksPerSecond;
   int get score => _halfPoints.reduce((a, b) => a + b) ~/ 2;
   List<int> get chorusScores =>
@@ -165,6 +169,8 @@ class FestivalPerformance {
           _ticksPerSecond;
   bool get generatorRunning =>
       _tick >= 76 * _ticksPerSecond && _tick < _generatorEnd;
+  Duration get generatorLoopPosition =>
+      festivalTick * ((_tick - 76 * _ticksPerSecond) % (2 * _ticksPerSecond));
   bool get signalQueued => _reservedTick != null && _tick < _reservedTick!;
   bool get waveTowardBack => _waveTowardBack;
   int? get waveFrame {
@@ -259,8 +265,25 @@ class FestivalPerformance {
   }
 
   void setVolume(FestivalZone zone, int value) {
+    final previous = List.of(_levels);
     _volumes[zone.index] = value.clamp(0, 100);
     _refreshLevels();
+    if (!finished &&
+        _chorusAt(_tick) != null &&
+        (previous[0] != CrowdStatus.ready && _levels[0] == CrowdStatus.ready ||
+            previous[1] != CrowdStatus.ready &&
+                _levels[1] == CrowdStatus.ready)) {
+      _cues.add((FestivalCue.applause, _tick));
+    }
+  }
+
+  List<FestivalCue> takeRecentCues() {
+    final cues = {
+      for (final (cue, at) in _cues)
+        if (_tick - at <= 2) cue,
+    };
+    _cues.clear();
+    return cues.toList(growable: false);
   }
 
   void queue(FestivalZone zone) {
@@ -276,6 +299,7 @@ class FestivalPerformance {
     for (var step = 0; step < count && !finished; step++) {
       final previous = _chorusAt(_tick);
       _tick++;
+      if (_tick == _generatorEnd) _cues.add((FestivalCue.generatorStop, _tick));
       if (_tick % _ticksPerBeat != 0) continue;
 
       _awardPreviousBeat(previous);
@@ -352,6 +376,7 @@ class FestivalPerformance {
     if (_tick < chorus.start * _ticksPerSecond) return;
     if (_tick == _reservedTick) {
       _signalSucceeded = _levels[_reserved!.index] == CrowdStatus.ready;
+      _cues.add((FestivalCue.call, _tick));
     }
 
     final wasTogether = _singing.every((value) => value);
@@ -373,6 +398,7 @@ class FestivalPerformance {
     if (!wasTogether && _singing.every((value) => value)) {
       _waveTick = _tick;
       _waveTowardBack = _reserved != FestivalZone.back;
+      _cues.add((FestivalCue.singalong, _tick));
     }
   }
 }

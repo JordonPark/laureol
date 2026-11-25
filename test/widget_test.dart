@@ -11,6 +11,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     records = FestivalRecords(await SharedPreferences.getInstance());
+    await records.setVolume(0);
   });
 
   testWidgets('Shows the game title on launch', (tester) async {
@@ -50,6 +51,9 @@ void main() {
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(320, 640));
+    final inset = tester.view.devicePixelRatio * 24;
+    tester.view.padding = FakeViewPadding(top: inset, bottom: inset);
+    addTearDown(tester.view.resetPadding);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(LaureolApp(records: records));
 
@@ -73,6 +77,22 @@ void main() {
     await tapLabel('동네 축제 시작');
     FestivalScene scene() =>
         tester.widget<FestivalScene>(find.byType(FestivalScene));
+    List<Rect> checkControlsInView() {
+      final sceneRect = tester.getRect(find.byType(FestivalScene));
+      final cards = find.byType(ZoneControlCard);
+      final front = tester.getRect(cards.first);
+      final back = tester.getRect(cards.last);
+      expect(front.top, back.top);
+      expect(sceneRect.top, greaterThanOrEqualTo(24));
+      expect(sceneRect.bottom, lessThan(front.top));
+      expect(front.bottom, lessThanOrEqualTo(616));
+      expect(back.bottom, lessThanOrEqualTo(616));
+      expect(Scrollable.of(tester.element(cards.first)).position.pixels, 0);
+      return [front, back];
+    }
+
+    final cardBounds = checkControlsInView();
+    expect(scene().compact, isTrue);
     await tester.pump(Duration(milliseconds: (176 - scene().tick) * 125));
     final rearSlider = find.byType(ZoneVolumeSlider).last;
     final track = find.descendant(
@@ -82,18 +102,22 @@ void main() {
             widget is GestureDetector && widget.onHorizontalDragUpdate != null,
       ),
     );
-    await tester.ensureVisible(track);
+    expect(tester.getSize(track).height, greaterThanOrEqualTo(48));
     await tester.tapAt(tester.getCenter(track));
     await tester.pump();
     expect(find.text('✓  준비'), findsNWidgets(2));
 
     final signal = find.text('라우럴!').first;
-    await tester.ensureVisible(signal);
+    expect(
+      tester.getSize(find.byType(SignalButton).first).height,
+      greaterThanOrEqualTo(48),
+    );
     await tester.tap(signal);
     await tester.pump();
 
     expect(find.text('신호 예약'), findsOneWidget);
     expect(find.text('남은 박 4'), findsOneWidget);
+    expect(checkControlsInView(), cardBounds);
 
     await tester.tap(find.bySemanticsLabel('일시정지'));
     await tester.pumpAndSettle();
@@ -116,10 +140,12 @@ void main() {
     expect(scene().front, CrowdStatus.singing);
     expect(scene().back, CrowdStatus.singing);
     expect(scene().waveFrame, isNotNull);
+    expect(checkControlsInView(), cardBounds);
 
     await tester.pump(Duration(milliseconds: (800 - scene().tick) * 125));
     await tapLabel('결과 보기');
     expect(find.text('전체 결과'), findsOneWidget);
+    expect(find.text('추천 연습 · 후렴 2 · 앞줄 미합류'), findsOneWidget);
     await tapLabel('후렴 2 연습 · 7/30');
     expect(find.text('후렴 2 연습'), findsOneWidget);
     expect(

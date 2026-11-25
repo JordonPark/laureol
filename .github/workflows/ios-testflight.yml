@@ -1,0 +1,74 @@
+name: Laureol iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: Upload the archive for internal TestFlight testing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: laureol-testflight
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Flutter
+        run: |
+          git clone --depth 1 --branch 3.50.1 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Check and archive the iPhone app
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          flutter pub get --enforce-lockfile
+          flutter analyze --no-pub
+          flutter test --no-pub
+          flutter build ipa --release --no-codesign --no-pub --build-number="$GITHUB_RUN_NUMBER"
+          archive="$PWD/build/ios/archive/Runner.xcarchive"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleIdentifier' "$archive/Info.plist")" = com.jordonpark.laureol
+
+      - name: Sign and upload to internal TestFlight
+        if: inputs.upload
+        env:
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ vars.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ vars.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          if [[ ! "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ || ! "$ASC_KEY_ID" =~ ^[A-Z0-9]{10}$ || -z "$ASC_ISSUER_ID" || -z "$ASC_PRIVATE_KEY" ]]; then
+            echo '::error::The Apple team or App Store Connect signing key is missing.'
+            exit 1
+          fi
+          umask 077
+          scratch=$(mktemp -d "$RUNNER_TEMP/laureol-sign.XXXXXX")
+          key="$scratch/AuthKey_$ASC_KEY_ID.p8"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$ASC_PRIVATE_KEY" > "$key"
+          unset ASC_PRIVATE_KEY
+
+          options="$scratch/ExportOptions.plist"
+          plutil -create xml1 "$options"
+          plutil -insert method -string app-store-connect "$options"
+          plutil -insert destination -string upload "$options"
+          plutil -insert signingStyle -string automatic "$options"
+          plutil -insert teamID -string "$APPLE_TEAM_ID" "$options"
+          plutil -insert manageAppVersionAndBuildNumber -bool NO "$options"
+          plutil -insert testFlightInternalTestingOnly -bool YES "$options"
+
+          xcodebuild -exportArchive -archivePath "$PWD/build/ios/archive/Runner.xcarchive" \
+            -exportPath "$scratch/export" -exportOptionsPlist "$options" \
+            -allowProvisioningUpdates -authenticationKeyPath "$key" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"

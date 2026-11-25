@@ -238,16 +238,24 @@ class BeatStrip extends StatelessWidget {
 }
 
 class EventNotice extends StatelessWidget {
-  const EventNotice({super.key, required this.message, this.remainingBeats});
+  const EventNotice({
+    super.key,
+    required this.message,
+    this.remainingBeats,
+    this.compact = false,
+  });
 
   final String message;
   final int? remainingBeats;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      height: compact ? 52 : null,
+      alignment: Alignment.centerLeft,
+      padding: EdgeInsets.all(compact ? 8 : 12),
       decoration: BoxDecoration(
         color: const Color(0xFF382A33),
         border: Border.all(color: _amber.withAlpha(140)),
@@ -255,18 +263,23 @@ class EventNotice extends StatelessWidget {
       ),
       child: Text(
         remainingBeats == null ? message : '$message · $remainingBeats박 후',
-        style: const TextStyle(color: _amber),
+        style: TextStyle(color: _amber, fontSize: compact ? 13 : null),
       ),
     );
   }
 }
 
 class PerformanceScore extends StatelessWidget {
-  const PerformanceScore({super.key, required this.score, this.maximum = 90})
-    : assert(maximum > 0 && score >= 0 && score <= maximum);
+  const PerformanceScore({
+    super.key,
+    required this.score,
+    this.maximum = 90,
+    this.compact = false,
+  }) : assert(maximum > 0 && score >= 0 && score <= maximum);
 
   final int score;
   final int maximum;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -277,12 +290,12 @@ class PerformanceScore extends StatelessWidget {
         TextSpan(
           style: const TextStyle(color: _muted),
           children: [
-            const TextSpan(text: '공연 점수  '),
+            if (!compact) const TextSpan(text: '공연 점수  '),
             TextSpan(
               text: '$score',
-              style: const TextStyle(
+              style: TextStyle(
                 color: _ink,
-                fontSize: 24,
+                fontSize: compact ? 16 : 24,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -303,6 +316,7 @@ class ZoneControlCard extends StatelessWidget {
     required this.onVolumeChanged,
     required this.signalState,
     this.onSignal,
+    this.compact = false,
   });
 
   final String zone;
@@ -311,11 +325,12 @@ class ZoneControlCard extends StatelessWidget {
   final ValueChanged<int> onVolumeChanged;
   final SignalState signalState;
   final VoidCallback? onSignal;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(compact ? 8 : 12),
       decoration: BoxDecoration(
         color: _panel,
         border: Border.all(color: _line),
@@ -332,9 +347,9 @@ class ZoneControlCard extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: compact ? 2 : 6),
           CrowdStatusBadge(status: status),
-          const SizedBox(height: 12),
+          SizedBox(height: compact ? 4 : 12),
           ZoneVolumeSlider(
             zone: zone,
             value: volume,

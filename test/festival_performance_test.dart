@@ -14,15 +14,20 @@ void main() {
     _at(performance, 22);
     expect(performance.remainingBeats, 4);
     performance.setVolume(back, 50);
+    expect(performance.takeRecentCues(), [FestivalCue.applause]);
     performance.queue(front);
     performance.queue(back);
     expect(performance.signal(front), SignalState.queued);
     expect(performance.signal(back), SignalState.waiting);
 
     _at(performance, 24);
+    expect(performance.position, const Duration(seconds: 24));
+    expect(performance.takeRecentCues(), [FestivalCue.call]);
+    expect(performance.takeRecentCues(), isEmpty);
     expect(performance.status(front), CrowdStatus.singing);
     expect(performance.signal(back), SignalState.responding);
     _at(performance, 25);
+    expect(performance.takeRecentCues(), [FestivalCue.singalong]);
     expect(performance.status(back), CrowdStatus.singing);
     expect(performance.waveFrame, 0);
     expect(performance.score, 1);
@@ -35,9 +40,11 @@ void main() {
     expect(performance.eventNotice, ('발전기 가동', 4));
     _at(performance, 76);
     expect(performance.generatorRunning, isTrue);
+    expect(performance.generatorLoopPosition, Duration.zero);
     expect(performance.status(FestivalZone.back), CrowdStatus.quiet);
     expect(performance.eventNotice, ('발전기 정지', 7));
     _at(performance, 79.5);
+    expect(performance.takeRecentCues(), [FestivalCue.generatorStop]);
     expect(performance.generatorRunning, isFalse);
     expect(performance.status(FestivalZone.back), CrowdStatus.ready);
     _at(performance, 82.5);
@@ -47,5 +54,18 @@ void main() {
     _at(performance, 90);
     expect(performance.score, 21);
     expect(performance.finished, isTrue);
+  });
+
+  test('Replay uses the original audio offset and drops expired cues', () {
+    final performance = FestivalPerformance();
+    _at(performance, 100);
+    expect(performance.takeRecentCues(), isEmpty);
+    final replay = FestivalPerformance.replay(
+      performance.chorusResult(3).checkpoint,
+    );
+    expect(replay.position, const Duration(seconds: 74));
+    expect(replay.takeRecentCues(), isEmpty);
+    _at(replay, 78.25);
+    expect(replay.generatorLoopPosition, const Duration(milliseconds: 250));
   });
 }

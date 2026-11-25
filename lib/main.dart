@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'chorus_summary.dart';
+import 'festival_audio.dart';
 import 'festival_performance.dart';
 import 'festival_records.dart';
 import 'festival_scene.dart';
@@ -86,17 +87,25 @@ class LaureolApp extends StatelessWidget {
 }
 
 class _Screen extends StatelessWidget {
-  const _Screen({required this.title, required this.children, this.trailing});
+  const _Screen({
+    required this.title,
+    required this.children,
+    this.trailing,
+    this.middle,
+    this.compact = false,
+  });
 
   final String title;
   final List<Widget> children;
   final Widget? trailing;
+  final Widget? middle;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: Text(title, style: const TextStyle(color: _paper)),
+        middle: middle ?? Text(title, style: const TextStyle(color: _paper)),
         previousPageTitle: '뒤로',
         trailing: trailing,
       ),
@@ -106,11 +115,13 @@ class _Screen extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              padding: compact
+                  ? const EdgeInsets.fromLTRB(12, 6, 12, 8)
+                  : const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
                 for (final child in children)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding: EdgeInsets.only(bottom: compact ? 6 : 12),
                     child: child,
                   ),
               ],
@@ -268,7 +279,10 @@ enum _PauseAction { resume, restart, exit }
 class _PerformanceScreenState extends State<_PerformanceScreen>
     with WidgetsBindingObserver {
   late FestivalPerformance _performance;
+  FestivalAudio? _audio;
   Timer? _clock;
+  int _clockGeneration = 0;
+  bool _starting = false;
   bool _pauseOpen = false;
   bool _openingResults = false;
   Future<bool>? _savingResult;
@@ -296,24 +310,27 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     final checkpoint = widget.checkpoint;
     await _open(
       context,
-      checkpoint == null
-          ? _ResultsScreen(
-              records: widget.records,
-              score: _performance.score,
-              results: [
-                for (var chorus = 1; chorus <= 3; chorus++)
-                  _performance.chorusResult(chorus),
-              ],
-              saved: saved,
-            )
-          : _PracticeResultsScreen(
-              records: widget.records,
-              result: _performance.chorusResult(checkpoint.chorus),
-              previous: widget.previousScore,
-              previousResult: widget.previousResult,
-              mastery: widget.mastery,
-              saved: saved,
-            ),
+      _ResultSound(
+        volume: widget.records.volume / 100,
+        child: checkpoint == null
+            ? _ResultsScreen(
+                records: widget.records,
+                score: _performance.score,
+                results: [
+                  for (var chorus = 1; chorus <= 3; chorus++)
+                    _performance.chorusResult(chorus),
+                ],
+                saved: saved,
+              )
+            : _PracticeResultsScreen(
+                records: widget.records,
+                result: _performance.chorusResult(checkpoint.chorus),
+                previous: widget.previousScore,
+                previousResult: widget.previousResult,
+                mastery: widget.mastery,
+                saved: saved,
+              ),
+      ),
       replace: true,
     );
   }
@@ -322,6 +339,9 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   void initState() {
     super.initState();
     _performance = _newPerformance();
+    if (widget.records.volume > 0) {
+      _audio = FestivalAudio(widget.records.volume / 100);
+    }
     WidgetsBinding.instance.addObserver(this);
     _resumeScene();
   }
@@ -330,6 +350,9 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _clock?.cancel();
+    _clockGeneration++;
+    final audio = _audio;
+    if (audio != null) unawaited(audio.dispose());
     super.dispose();
   }
 
@@ -338,29 +361,62 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     if (state == AppLifecycleState.resumed) {
       if (!_pauseOpen) _resumeScene();
     } else {
-      _clock?.cancel();
-      _clock = null;
+      _freezeScene();
     }
   }
 
   void _resumeScene() {
-    if (_clock != null || _performance.finished) return;
+    if (_clock != null || _starting || _performance.finished) return;
+    final audio = _audio;
+    if (audio == null) {
+      _startClock();
+    } else {
+      _starting = true;
+      unawaited(_startAfterAudio(audio, ++_clockGeneration));
+    }
+  }
+
+  Future<void> _startAfterAudio(FestivalAudio audio, int generation) async {
+    await audio.start(_performance);
+    if (!mounted || generation != _clockGeneration) return;
+    _starting = false;
+    _startClock();
+  }
+
+  void _freezeScene() {
+    _clockGeneration++;
+    _starting = false;
+    _clock?.cancel();
+    _clock = null;
+    _audio?.pause();
+  }
+
+  void _updateAudio() {
+    final audio = _audio;
+    if (audio == null) {
+      _performance.takeRecentCues();
+    } else {
+      audio.update(_performance);
+    }
+  }
+
+  void _startClock() {
     var previousTick = 0;
     _clock = Timer.periodic(festivalTick, (timer) {
       setState(() => _performance.advanceTicks(timer.tick - previousTick));
       previousTick = timer.tick;
       if (_performance.finished) {
-        timer.cancel();
-        _clock = null;
+        _freezeScene();
         _savingResult = _saveResult();
+      } else {
+        _updateAudio();
       }
     });
   }
 
   Future<void> _pause() async {
     _pauseOpen = true;
-    _clock?.cancel();
-    _clock = null;
+    _freezeScene();
     final action = await showCupertinoDialog<_PauseAction>(
       context: context,
       builder: (dialog) => CupertinoAlertDialog(
@@ -406,15 +462,37 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) =>
+          _buildPerformance(context, constraints.maxWidth),
+    );
+  }
+
+  Widget _buildPerformance(BuildContext context, double availableWidth) {
     final chorus = widget.checkpoint?.chorus;
     final performance = _performance;
     final notice = performance.eventNotice;
+    final media = MediaQuery.of(context);
+    final compact = availableWidth <= 380 && media.textScaler.scale(14) <= 16;
+    final title = chorus == null
+        ? '동네 축제 공연'
+        : widget.mastery
+        ? '숙련 후렴 도전'
+        : '후렴 $chorus 연습';
+    final score = PerformanceScore(
+      score: performance.score,
+      maximum: performance.maximum,
+      compact: compact,
+    );
     ZoneControlCard card(FestivalZone zone, String label) => ZoneControlCard(
       zone: label,
+      compact: compact,
       status: performance.status(zone),
       volume: performance.volume(zone),
-      onVolumeChanged: (value) =>
-          setState(() => performance.setVolume(zone, value)),
+      onVolumeChanged: (value) {
+        setState(() => performance.setVolume(zone, value));
+        _updateAudio();
+      },
       signalState: performance.signal(zone),
       onSignal: () {
         if (performance.signal(zone) != SignalState.available) return;
@@ -428,11 +506,25 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     final back = card(FestivalZone.back, '뒷줄');
 
     return _Screen(
-      title: chorus == null
-          ? '동네 축제 공연'
-          : widget.mastery
-          ? '숙련 후렴 도전'
-          : '후렴 $chorus 연습',
+      title: title,
+      compact: compact,
+      middle: compact
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: _paper, fontSize: 13),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                score,
+              ],
+            )
+          : null,
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
         minimumSize: const Size(48, 40),
@@ -441,6 +533,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       ),
       children: [
         FestivalScene(
+          compact: compact,
           tick: performance.tick,
           front: performance.status(FestivalZone.front),
           back: performance.status(FestivalZone.back),
@@ -449,11 +542,12 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
           waveFrame: performance.waveFrame,
           waveTowardBack: performance.waveTowardBack,
         ),
-        PerformanceScore(
-          score: performance.score,
-          maximum: performance.maximum,
+        if (!compact) score,
+        EventNotice(
+          message: notice.$1,
+          remainingBeats: notice.$2,
+          compact: compact,
         ),
-        EventNotice(message: notice.$1, remainingBeats: notice.$2),
         BeatStrip(remaining: performance.remainingBeats, total: 6),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -480,6 +574,49 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   }
 }
 
+class _ResultSound extends StatefulWidget {
+  const _ResultSound({required this.volume, required this.child});
+
+  final double volume;
+  final Widget child;
+
+  @override
+  State<_ResultSound> createState() => _ResultSoundState();
+}
+
+class _ResultSoundState extends State<_ResultSound>
+    with WidgetsBindingObserver {
+  FestivalResultAudio? _audio;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.volume == 0) return;
+    WidgetsBinding.instance.addObserver(this);
+    final audio = FestivalResultAudio(widget.volume);
+    _audio = audio;
+    unawaited(audio.play());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _audio?.stop();
+  }
+
+  @override
+  void dispose() {
+    final audio = _audio;
+    if (audio != null) {
+      WidgetsBinding.instance.removeObserver(this);
+      unawaited(audio.dispose());
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 class _ResultsScreen extends StatelessWidget {
   const _ResultsScreen({
     required this.records,
@@ -495,12 +632,17 @@ class _ResultsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final recommended = recommendedChorusPractice(results);
     return _Screen(
       title: '전체 결과',
       children: [
         PerformanceScore(score: score),
         if (!saved) const Text('최고 기록을 저장하지 못했어요.'),
         for (final result in results) ...[
+          ChorusSummary(
+            result: result,
+            recommended: identical(recommended, result),
+          ),
           _Action(
             '후렴 ${result.chorus} 연습 · ${result.score}/30',
             () => _open(
@@ -512,8 +654,8 @@ class _ResultsScreen extends StatelessWidget {
                 previousResult: result,
               ),
             ),
+            primary: identical(recommended, result),
           ),
-          ChorusSummary(result: result),
         ],
         _Action(
           '공연 다시 하기',
@@ -549,6 +691,9 @@ class _PracticeResultsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final difference =
+        result.togetherBeats -
+        (previousResult?.togetherBeats ?? result.togetherBeats);
     return _Screen(
       title: mastery ? '숙련 후렴 결과' : '후렴 연습 결과',
       children: [
@@ -564,6 +709,12 @@ class _PracticeResultsScreen extends StatelessWidget {
           ),
         if (!saved) const Text('최고 기록을 저장하지 못했어요.'),
         if (previousResult != null) ...[
+          Text(
+            difference == 0
+                ? '동시 떼창 시간 유지'
+                : '동시 떼창 ${(difference.abs() / 2).toStringAsFixed(1)}초 ${difference > 0 ? '증가' : '감소'}',
+            style: const TextStyle(color: _muted),
+          ),
           const Text('이전 떼창 기록'),
           ChorusSummary(result: previousResult!),
           const Text('이번 떼창 기록'),
