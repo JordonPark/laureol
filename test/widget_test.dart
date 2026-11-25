@@ -179,6 +179,7 @@ void main() {
         find.byType(FestivalScene),
         cards.first,
         cards.last,
+        find.byType(SignalButton),
       ]) {
         final bounds = tester.getRect(target);
         expect(bounds.left, greaterThanOrEqualTo(safeBounds.left));

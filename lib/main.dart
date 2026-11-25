@@ -1056,10 +1056,10 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         safeWidth >= 600 &&
         viewport.maxWidth > viewport.maxHeight;
     final fullSceneHeight = (math.min(safeWidth, 520.0) - 32) * 324 / 360;
-    // Leave room for the score, notices, and both 48-point controls per card.
+    // Leave room for the score, notices, sliders, and shared signal button.
     final compact =
         standardText &&
-        (sideBySide || safeWidth <= 380 || bodyHeight < fullSceneHeight + 390);
+        (sideBySide || safeWidth <= 380 || bodyHeight < fullSceneHeight + 410);
     final title = widget.recovery != null
         ? '콤보 복구 연습'
         : chorus == null
