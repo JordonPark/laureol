@@ -212,7 +212,9 @@ class FestivalPerformance {
 
   (String, int?) get eventNotice {
     if (seconds < 14 && practiceChorus == null) {
-      return ('리허설 · 뒷줄 볼륨을 올려보세요', null);
+      return status(FestivalZone.back) == CrowdStatus.ready
+          ? ('리허설 · 노란 신호 버튼을 기다려요', null)
+          : ('리허설 · 뒷줄 볼륨을 밀어 ✓ 준비에 맞춰요', null);
     }
     final due = switch (seconds) {
       >= 46 && < 48 => ('앞줄 관객 접근', 48 * _ticksPerSecond),
@@ -226,14 +228,15 @@ class FestivalPerformance {
     if (_tick >= _generatorEnd && seconds < 82) return ('발전기 정지 완료', null);
     if (seconds >= 48 && seconds < 50) return ('앞줄 체감 볼륨 증가', null);
     final chorus = _chorusAt(_tick);
-    if (chorus != null && _isOpen(chorus)) {
-      return (chorus.number == 0 ? '리허설 · 신호를 예약해 보세요' : '시작 구역을 선택하세요', null);
+    if (signalQueued) return ('신호 예약 · 박자에 맞춰 떼창이 시작돼요', null);
+    if (chorus != null && _reserved == null && _isOpen(chorus)) {
+      return ('노란 ‘라우럴!’ 버튼을 준비된 쪽에서 눌러요', null);
     }
     if (chorus != null &&
         _tick >= (chorus.start + 3) * _ticksPerSecond &&
         _tick < chorus.end * _ticksPerSecond &&
         !_signalSucceeded) {
-      return ('볼륨을 맞추면 떼창에 합류해요', null);
+      return ('볼륨을 ✓ 준비에 맞추면 떼창에 합류해요', null);
     }
     if (chorus != null && seconds >= chorus.start) {
       return (

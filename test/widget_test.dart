@@ -20,6 +20,69 @@ void main() {
     expect(find.text('라우럴! 볼륨 좀 올려'), findsOneWidget);
   });
 
+  for (final (name, size, padding) in [
+    (
+      'short portrait',
+      const Size(390, 740),
+      const EdgeInsets.only(top: 59, bottom: 34),
+    ),
+    (
+      'landscape with a notch',
+      const Size(852, 393),
+      const EdgeInsets.only(left: 59, right: 59, bottom: 21),
+    ),
+  ]) {
+    testWidgets('iPhone $name keeps live controls and results in reach', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(size);
+      final ratio = tester.view.devicePixelRatio;
+      tester.view.padding = FakeViewPadding(
+        left: padding.left * ratio,
+        top: padding.top * ratio,
+        right: padding.right * ratio,
+        bottom: padding.bottom * ratio,
+      );
+      addTearDown(tester.view.resetPadding);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(LaureolApp(records: records));
+
+      await tester.tap(find.text('공연 시작'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('두 줄이 함께 부르면 점수가 올라요'), findsOneWidget);
+      final start = find.text('동네 축제 시작');
+      expect(start.hitTestable(), findsOneWidget);
+      await tester.tap(start);
+      await tester.pumpAndSettle();
+
+      final safeBounds = padding.deflateRect(Offset.zero & size);
+      final cards = find.byType(ZoneControlCard);
+      expect(cards, findsNWidgets(2));
+      expect(find.textContaining('뒷줄 볼륨을 밀어 ✓ 준비에 맞춰요'), findsOneWidget);
+      for (final target in [
+        find.byType(FestivalScene),
+        cards.first,
+        cards.last,
+      ]) {
+        final bounds = tester.getRect(target);
+        expect(bounds.left, greaterThanOrEqualTo(safeBounds.left));
+        expect(bounds.right, lessThanOrEqualTo(safeBounds.right));
+        expect(bounds.top, greaterThanOrEqualTo(safeBounds.top));
+        expect(bounds.bottom, lessThanOrEqualTo(safeBounds.bottom));
+      }
+      expect(Scrollable.of(tester.element(cards.first)).position.pixels, 0);
+      expect(find.byType(ZoneVolumeSlider).hitTestable(), findsNWidgets(2));
+
+      await tester.pump(const Duration(seconds: 100));
+      final results = find.text('결과 보기');
+      expect(results.hitTestable(), findsOneWidget);
+      await tester.tap(results);
+      await tester.pumpAndSettle();
+      expect(find.text('전체 결과'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }, variant: TargetPlatformVariant({TargetPlatform.iOS}));
+  }
+
   testWidgets('Large system text keeps the rear controls reachable', (
     tester,
   ) async {

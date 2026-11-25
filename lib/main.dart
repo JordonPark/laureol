@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 // Retain the SDK widgets while this prototype has no external UI dependencies.
 // ignore: deprecated_member_use
@@ -26,6 +27,10 @@ const _muted = Color(0xFFBDB8CD);
 const _gold = Color(0xFFFFC46A);
 const _uiFont = 'Laureol Sans';
 const _stage = 'docs/art/festival/stage.png';
+const _playGuide =
+    '볼륨을 밀어 앞줄·뒷줄을 ✓ 준비에 맞춰요.\n'
+    '노란 ‘라우럴!’ 버튼이 뜨면 준비된 한쪽을 눌러요.\n'
+    '두 줄이 함께 부르면 점수가 올라요.';
 
 Future<void> _open(
   BuildContext context,
@@ -93,6 +98,8 @@ class _Screen extends StatelessWidget {
     this.trailing,
     this.middle,
     this.compact = false,
+    this.maxWidth = 520,
+    this.footer,
   });
 
   final String title;
@@ -100,9 +107,27 @@ class _Screen extends StatelessWidget {
   final Widget? trailing;
   final Widget? middle;
   final bool compact;
+  final double maxWidth;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
+    final horizontal = compact ? 12.0 : 16.0;
+    final content = ListView(
+      padding: EdgeInsets.fromLTRB(
+        horizontal,
+        compact ? 6 : 12,
+        horizontal,
+        compact ? 8 : 24,
+      ),
+      children: [
+        for (final child in children)
+          Padding(
+            padding: EdgeInsets.only(bottom: compact ? 6 : 12),
+            child: child,
+          ),
+      ],
+    );
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: middle ?? Text(title, style: const TextStyle(color: _paper)),
@@ -113,19 +138,24 @@ class _Screen extends StatelessWidget {
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: ListView(
-              padding: compact
-                  ? const EdgeInsets.fromLTRB(12, 6, 12, 8)
-                  : const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              children: [
-                for (final child in children)
-                  Padding(
-                    padding: EdgeInsets.only(bottom: compact ? 6 : 12),
-                    child: child,
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: footer == null
+                ? content
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: content),
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontal,
+                          4,
+                          horizontal,
+                          8,
+                        ),
+                        child: footer!,
+                      ),
+                    ],
                   ),
-              ],
-            ),
           ),
         ),
       ),
@@ -169,7 +199,7 @@ class _StageArt extends StatelessWidget {
       ),
       child: Image.asset(
         _stage,
-        height: height,
+        height: math.min(height, MediaQuery.sizeOf(context).height * .25),
         fit: BoxFit.contain,
         filterQuality: FilterQuality.none,
         semanticLabel: '해 질 녘 동네 축제 도트 무대',
@@ -187,6 +217,7 @@ class _StartScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return _Screen(
       title: '라우럴!',
+      compact: MediaQuery.sizeOf(context).height < 480,
       children: [
         const _StageArt(height: 220),
         const Text(
@@ -237,6 +268,7 @@ class _SelectionScreenState extends State<_SelectionScreen> {
     final masteryBest = widget.records.masteryBest;
     return _Screen(
       title: '공연 선택',
+      compact: MediaQuery.sizeOf(context).height < 480,
       children: [
         const _StageArt(height: 200),
         const Text(
@@ -244,9 +276,10 @@ class _SelectionScreenState extends State<_SelectionScreen> {
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
         ),
         const Text('약 100초 · 후렴 3개', style: TextStyle(color: _muted)),
-        if (best != null) Text('일반 공연 최고 기록 ${best.score}/90'),
+        const Text(_playGuide, style: TextStyle(color: _paper, fontSize: 14)),
         _Action('동네 축제 시작', () => _play(), primary: true),
         if (best != null) ...[
+          Text('일반 공연 최고 기록 ${best.score}/90'),
           if (masteryBest != null) Text('숙련 후렴 최고 기록 $masteryBest/30'),
           _Action('숙련 후렴 도전', () => _play(checkpoint: best.checkpoint)),
         ],
@@ -421,6 +454,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       context: context,
       builder: (dialog) => CupertinoAlertDialog(
         title: const Text('일시정지'),
+        content: const Text(_playGuide),
         actions: [
           CupertinoDialogAction(
             isDefaultAction: true,
@@ -464,16 +498,30 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) =>
-          _buildPerformance(context, constraints.maxWidth),
+          _buildPerformance(context, constraints),
     );
   }
 
-  Widget _buildPerformance(BuildContext context, double availableWidth) {
+  Widget _buildPerformance(BuildContext context, BoxConstraints viewport) {
     final chorus = widget.checkpoint?.chorus;
     final performance = _performance;
     final notice = performance.eventNotice;
     final media = MediaQuery.of(context);
-    final compact = availableWidth <= 380 && media.textScaler.scale(14) <= 16;
+    final safeWidth = viewport.maxWidth - media.padding.horizontal;
+    final bodyHeight =
+        viewport.maxHeight -
+        media.padding.vertical -
+        kMinInteractiveDimensionCupertino;
+    final standardText = media.textScaler.scale(14) <= 16;
+    final sideBySide =
+        standardText &&
+        safeWidth >= 600 &&
+        viewport.maxWidth > viewport.maxHeight;
+    final fullSceneHeight = (math.min(safeWidth, 520.0) - 32) * 324 / 360;
+    // Leave room for the score, notices, and both 48-point controls per card.
+    final compact =
+        standardText &&
+        (sideBySide || safeWidth <= 380 || bodyHeight < fullSceneHeight + 390);
     final title = chorus == null
         ? '동네 축제 공연'
         : widget.mastery
@@ -505,9 +553,56 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     final front = card(FestivalZone.front, '앞줄');
     final back = card(FestivalZone.back, '뒷줄');
 
+    final scene = FestivalScene(
+      compact: compact,
+      tick: performance.tick,
+      front: performance.status(FestivalZone.front),
+      back: performance.status(FestivalZone.back),
+      generatorRunning: performance.generatorRunning,
+      signalQueued: performance.signalQueued,
+      waveFrame: performance.waveFrame,
+      waveTowardBack: performance.waveTowardBack,
+    );
+    final stage = compact
+        ? Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: math.max(120, bodyHeight - (sideBySide ? 20 : 310)),
+              ),
+              child: scene,
+            ),
+          )
+        : scene;
+    final cue = EventNotice(
+      message: notice.$1,
+      remainingBeats: notice.$2,
+      compact: compact,
+    );
+    final beats = BeatStrip(remaining: performance.remainingBeats, total: 6);
+    final controls = LayoutBuilder(
+      builder: (context, constraints) {
+        final largeText = MediaQuery.textScalerOf(context).scale(14) > 20;
+        if (constraints.maxWidth < 280 || largeText) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [front, const SizedBox(height: 8), back],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: front),
+            const SizedBox(width: 8),
+            Expanded(child: back),
+          ],
+        );
+      },
+    );
+
     return _Screen(
       title: title,
       compact: compact,
+      maxWidth: sideBySide ? 900 : 520,
       middle: compact
           ? Row(
               mainAxisSize: MainAxisSize.min,
@@ -531,45 +626,31 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         onPressed: _pause,
         child: Semantics(label: '일시정지', child: Icon(CupertinoIcons.pause_fill)),
       ),
-      children: [
-        FestivalScene(
-          compact: compact,
-          tick: performance.tick,
-          front: performance.status(FestivalZone.front),
-          back: performance.status(FestivalZone.back),
-          generatorRunning: performance.generatorRunning,
-          signalQueued: performance.signalQueued,
-          waveFrame: performance.waveFrame,
-          waveTowardBack: performance.waveTowardBack,
-        ),
-        if (!compact) score,
-        EventNotice(
-          message: notice.$1,
-          remainingBeats: notice.$2,
-          compact: compact,
-        ),
-        BeatStrip(remaining: performance.remainingBeats, total: 6),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final largeText = MediaQuery.textScalerOf(context).scale(14) > 20;
-            if (constraints.maxWidth < 280 || largeText) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [front, const SizedBox(height: 8), back],
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: front),
-                const SizedBox(width: 8),
-                Expanded(child: back),
-              ],
-            );
-          },
-        ),
-        if (performance.finished) _Action('결과 보기', _showResults, primary: true),
-      ],
+      footer: performance.finished
+          ? _Action('결과 보기', _showResults, primary: true)
+          : null,
+      children: sideBySide
+          ? [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: stage),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        cue,
+                        const SizedBox(height: 6),
+                        beats,
+                        const SizedBox(height: 6),
+                        controls,
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ]
+          : [stage, if (!compact) score, cue, beats, controls],
     );
   }
 }
