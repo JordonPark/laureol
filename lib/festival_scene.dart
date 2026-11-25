@@ -295,6 +295,7 @@ class _FestivalPainter extends CustomPainter {
         style: TextStyle(
           color: color,
           fontSize: 13,
+          fontFamily: 'Laureol Sans',
           fontWeight: FontWeight.w800,
         ),
       ),

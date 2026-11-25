@@ -631,3 +631,36 @@
 ## 34. 플랫폼 검수
 
 [실기기 검수표](device-qa.md)에 대상과 통과 기준을 기록해요. iOS·Android에서 각각 작은 세로 화면, 큰 글자, 무음·오프라인, 일시정지·복귀 시나리오를 검사해요. Android 에뮬레이터 결과는 실기기 결과와 별도로 적어요.
+
+## 35. 첫 버전 음원·폰트·스토어 리소스
+
+### 공연 음원과 효과음
+
+[동네 축제 공연곡](../assets/audio/festival-first-show.wav)은 120 BPM, 4/4박자, 100초 분량의 오리지널 픽셀 팝 반주예요. 첫 박은 파일 시작점에 있고, **24.0초·52.0초·80.0초**에는 각각 후렴 멜로디와 타격음이 함께 시작해요. 44.1kHz, 16bit PCM WAV로 앱 번들에 포함해요.
+
+| 효과음 | 길이 | 재생 지점 |
+|---|---:|---|
+| [라우럴! 음성](../assets/audio/sfx/laureol-call.wav) | 0.78초 | 신호 실행 박. 한국어 합성 음성으로 제작했어요. |
+| [관객 박수](../assets/audio/sfx/crowd-clap.wav) | 0.85초 | 관객이 준비를 마쳤을 때 짧게 재생해요. |
+| [관객 떼창](../assets/audio/sfx/crowd-singalong.wav) | 2.05초 | 상대 구역이 합류한 박에 재생해요. |
+| [발전기 작동](../assets/audio/sfx/generator-loop.wav) | 2.00초 | 발전기 가동 구간에서 반복해요. |
+| [발전기 정지](../assets/audio/sfx/generator-stop.wav) | 0.88초 | 작동 루프를 종료할 때 한 번 재생해요. |
+| [결과 확인](../assets/audio/sfx/result-chime.wav) | 1.34초 | 공연 결과가 열릴 때 한 번 재생해요. |
+
+오디오는 번들에 등록했어요. 실제 공연 재생, 음량 설정 적용, 일시정지·후렴 재도전 시 탐색 연결은 남아 있어요.
+
+### 한글 UI 폰트
+
+**Laureol Sans**는 Noto Sans KR을 기본으로 모든 현대 한글 완성형 음절, 자모, 숫자와 UI용 기호를 남긴 게임 전용 파생 서체예요. 일반 400과 굵게 700을 번들에 포함하고 화면과 객석 표기에 사용해요. [원본 Noto Sans KR](https://github.com/google/fonts/tree/b38c5c93af322c45f633e17ac440ec1e6c94d489/ofl/notosanskr) · [SIL OFL 라이선스](../assets/fonts/OFL.txt)
+
+### 앱 아이콘과 스토어 이미지
+
+- [앱 아이콘 원본](art/store/app-icon-1024.png)에서 iOS 앱 아이콘과 Android 런처 아이콘의 크기별 파일을 만들었어요. [Google Play 아이콘](art/store/play-icon-512.png)은 별도로 제공해요.
+- [Google Play 대표 이미지](art/store/play-feature-1024x500.png)는 동네 축제와 관객이 떼창하는 장면을 담은 1024×500 홍보 이미지예요. [Google Play 이미지 규격](https://support.google.com/googleplay/android-developer/answer/9866151?hl=en)
+- 스토어 스크린샷은 실제 Flutter 앱에서 리허설, 양쪽 떼창, 결과 화면을 캡처한 세 장이에요. iPhone은 1320×2868, Android는 1080×1920으로 내보냈어요. iPhone용 이미지는 공용 Flutter 화면을 해당 크기로 렌더링한 결과이며, iOS 실기기 캡처와 심사 제출은 별도로 진행해요. [Apple 스크린샷 규격](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications)
+
+| 화면 | iPhone | Android |
+|---|---|---|
+| 공연 조작 | [리허설](art/store/iphone/01-festival.png) | [리허설](art/store/android/01-festival.png) |
+| 떼창 연출 | [양쪽 떼창](art/store/iphone/02-singalong.png) | [양쪽 떼창](art/store/android/02-singalong.png) |
+| 결과 | [후렴별 점수](art/store/iphone/03-results.png) | [후렴별 점수](art/store/android/03-results.png) |

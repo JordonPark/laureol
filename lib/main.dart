@@ -23,6 +23,7 @@ const _night = Color(0xFF171329);
 const _paper = Color(0xFFF7F2FF);
 const _muted = Color(0xFFBDB8CD);
 const _gold = Color(0xFFFFC46A);
+const _uiFont = 'Laureol Sans';
 const _stage = 'docs/art/festival/stage.png';
 
 Future<void> _open(
@@ -48,6 +49,7 @@ class LaureolApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return CupertinoApp(
       title: '라우럴! 볼륨 좀 올려',
+      debugShowCheckedModeBanner: false,
       theme: const CupertinoThemeData(
         brightness: Brightness.dark,
         primaryColor: _gold,
@@ -55,7 +57,27 @@ class LaureolApp extends StatelessWidget {
         barBackgroundColor: _night,
         textTheme: CupertinoTextThemeData(
           primaryColor: _gold,
-          textStyle: TextStyle(color: _paper, fontSize: 16),
+          textStyle: TextStyle(
+            color: _paper,
+            fontSize: 16,
+            fontFamily: _uiFont,
+          ),
+          actionTextStyle: TextStyle(
+            color: _gold,
+            fontSize: 16,
+            fontFamily: _uiFont,
+          ),
+          navTitleTextStyle: TextStyle(
+            color: _paper,
+            fontSize: 17,
+            fontFamily: _uiFont,
+            fontWeight: FontWeight.w700,
+          ),
+          navActionTextStyle: TextStyle(
+            color: _gold,
+            fontSize: 16,
+            fontFamily: _uiFont,
+          ),
         ),
       ),
       home: _StartScreen(records: records),
