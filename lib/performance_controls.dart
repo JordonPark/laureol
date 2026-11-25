@@ -69,6 +69,8 @@ class ZoneVolumeSlider extends StatelessWidget {
     required this.onChanged,
     this.enabled = true,
     this.highlighted = false,
+    this.target,
+    this.onInteractionEnd,
   }) : assert(value >= 0 && value <= 100);
 
   final String zone;
@@ -76,12 +78,22 @@ class ZoneVolumeSlider extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final bool enabled;
   final bool highlighted;
+  final ({int minimum, int maximum})? target;
+  final VoidCallback? onInteractionEnd;
 
   @override
   Widget build(BuildContext context) {
+    final band = target;
+    void adjustBy(int delta) {
+      onChanged((value + delta).clamp(0, 100));
+      onInteractionEnd?.call();
+    }
+
     return Semantics(
       label: '$zone 볼륨',
-      value: '$value%',
+      value: band == null
+          ? '$value%'
+          : '$value%, 준비 구간 ${band.minimum}%에서 ${band.maximum}%',
       enabled: enabled,
       increasedValue: enabled && value < 100
           ? '${(value + 5).clamp(0, 100)}%'
@@ -90,12 +102,8 @@ class ZoneVolumeSlider extends StatelessWidget {
           ? '${(value - 5).clamp(0, 100)}%'
           : null,
       slider: true,
-      onIncrease: enabled && value < 100
-          ? () => onChanged((value + 5).clamp(0, 100))
-          : null,
-      onDecrease: enabled && value > 0
-          ? () => onChanged((value - 5).clamp(0, 100))
-          : null,
+      onIncrease: enabled && value < 100 ? () => adjustBy(5) : null,
+      onDecrease: enabled && value > 0 ? () => adjustBy(-5) : null,
       child: ExcludeSemantics(
         child: Column(
           children: [
@@ -129,11 +137,17 @@ class ZoneVolumeSlider extends StatelessWidget {
                     onTapDown: enabled
                         ? (details) => update(details.localPosition.dx)
                         : null,
+                    onTapUp: enabled && onInteractionEnd != null
+                        ? (_) => onInteractionEnd!()
+                        : null,
                     onHorizontalDragStart: enabled
                         ? (details) => update(details.localPosition.dx)
                         : null,
                     onHorizontalDragUpdate: enabled
                         ? (details) => update(details.localPosition.dx)
+                        : null,
+                    onHorizontalDragEnd: enabled && onInteractionEnd != null
+                        ? (_) => onInteractionEnd!()
                         : null,
                     child: Stack(
                       alignment: Alignment.centerLeft,
@@ -156,6 +170,13 @@ class ZoneVolumeSlider extends StatelessWidget {
                                 : _muted,
                           ),
                         ),
+                        if (band != null)
+                          Positioned(
+                            left: thumb / 2 + track * band.minimum / 100,
+                            width: track * (band.maximum - band.minimum) / 100,
+                            height: 16,
+                            child: const ColoredBox(color: _mint),
+                          ),
                         Positioned(
                           left: filled,
                           width: thumb,
@@ -476,8 +497,6 @@ class PerformanceScore extends StatelessWidget {
   }
 }
 
-enum ControlHighlight { volume, signal }
-
 class ZoneControlCard extends StatelessWidget {
   const ZoneControlCard({
     super.key,
@@ -488,8 +507,7 @@ class ZoneControlCard extends StatelessWidget {
     required this.signalState,
     this.onSignal,
     this.compact = false,
-    this.volumeEnabled = true,
-    this.highlight,
+    this.selected = false,
   });
 
   final String zone;
@@ -499,8 +517,7 @@ class ZoneControlCard extends StatelessWidget {
   final SignalState signalState;
   final VoidCallback? onSignal;
   final bool compact;
-  final bool volumeEnabled;
-  final ControlHighlight? highlight;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -508,7 +525,7 @@ class ZoneControlCard extends StatelessWidget {
       padding: EdgeInsets.all(compact ? 8 : 12),
       decoration: BoxDecoration(
         color: _panel,
-        border: Border.all(color: highlight == null ? _line : _amber),
+        border: Border.all(color: selected ? status.color : _line),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -529,8 +546,6 @@ class ZoneControlCard extends StatelessWidget {
             zone: zone,
             value: volume,
             onChanged: onVolumeChanged,
-            enabled: volumeEnabled,
-            highlighted: highlight == ControlHighlight.volume,
           ),
           SignalButton(state: signalState, onPressed: onSignal),
         ],

@@ -33,16 +33,16 @@ void main() {
     await tester.pumpWidget(LaureolApp(records: firstRun));
     await tester.tap(find.text('공연 시작'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('리허설 시작'));
-    await tester.pumpAndSettle();
 
     FestivalScene scene() =>
         tester.widget<FestivalScene>(find.byType(FestivalScene));
-    final front = find.byType(ZoneVolumeSlider).first;
-    final rear = find.byType(ZoneVolumeSlider).last;
+    final rear = find.byType(ZoneVolumeSlider);
+    expect(find.text('공연 선택'), findsNothing);
+    expect(rear, findsOneWidget);
+    expect(find.byType(PerformanceScore), findsNothing);
+    expect(find.text('라우럴!'), findsNothing);
     expect(scene().tick, 0);
-    expect(find.text('1/2 볼륨 조절'), findsOneWidget);
-    expect(tester.widget<ZoneVolumeSlider>(front).enabled, isFalse);
+    expect(find.text('뒷줄 볼륨을 맞춰요'), findsOneWidget);
     expect(tester.widget<ZoneVolumeSlider>(rear).highlighted, isTrue);
     await tester.pump(const Duration(seconds: 25));
     expect(scene().tick, 0);
@@ -54,9 +54,19 @@ void main() {
             widget is GestureDetector && widget.onHorizontalDragUpdate != null,
       ),
     );
-    await tester.tapAt(tester.getCenter(rearTrack));
+    final track = tester.getRect(rearTrack);
+    final gesture = await tester.startGesture(
+      Offset(track.left + track.width * .39, track.center.dy),
+    );
+    await gesture.moveBy(const Offset(20, 0));
+    await gesture.moveTo(track.center);
     await tester.pump();
-    expect(find.text('2/2 신호 보내기'), findsOneWidget);
+    expect(scene().focusedZone, FestivalZone.back);
+    expect(scene().focusedVolume, 50);
+    expect(find.text('라우럴!'), findsNothing);
+    await gesture.up();
+    await tester.pump();
+    expect(find.text('이제 관객에게 신호를 보내요'), findsOneWidget);
     expect(find.text('라우럴!'), findsOneWidget);
     expect(scene().tick, 112);
     await tester.pump(const Duration(seconds: 25));
@@ -69,14 +79,14 @@ void main() {
     await tester.pump(const Duration(seconds: 4));
     expect(firstRun.rehearsalCompleted, isTrue);
     expect(find.text('동네 축제 공연'), findsOneWidget);
-    expect(tester.widget<ZoneVolumeSlider>(rear).value, 50);
-    expect(tester.widget<ZoneVolumeSlider>(front).enabled, isTrue);
+    expect(tester.widget<ZoneVolumeSlider>(rear.last).value, 50);
+    expect(rear, findsNWidgets(2));
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(LaureolApp(records: firstRun));
     await tester.tap(find.text('공연 시작'));
     await tester.pumpAndSettle();
-    expect(find.text('리허설 시작'), findsNothing);
+    expect(find.text('조작 다시 연습'), findsOneWidget);
     await tester.tap(find.text('동네 축제 시작'));
     await tester.pumpAndSettle();
     expect(scene().tick, greaterThanOrEqualTo(160));
@@ -163,7 +173,7 @@ void main() {
       final safeBounds = padding.deflateRect(Offset.zero & size);
       final cards = find.byType(ZoneControlCard);
       expect(cards, findsNWidgets(2));
-      expect(find.textContaining('첫 후렴 · 두 줄을 ✓ 준비에 맞춰요'), findsOneWidget);
+      expect(find.textContaining('뒷줄 볼륨을 올려 ✓ 준비에 맞춰요'), findsOneWidget);
       for (final target in [
         find.byType(FestivalScene),
         cards.first,
@@ -177,6 +187,27 @@ void main() {
       }
       expect(Scrollable.of(tester.element(cards.first)).position.pixels, 0);
       expect(find.byType(ZoneVolumeSlider).hitTestable(), findsNWidgets(2));
+      await tester.tap(find.bySemanticsLabel('앞줄 볼륨 조작으로 이동'));
+      await tester.pump();
+      expect(
+        tester.widget<FestivalScene>(find.byType(FestivalScene)).focusedZone,
+        FestivalZone.front,
+      );
+      expect(tester.widget<ZoneControlCard>(cards.first).selected, isTrue);
+      final backTrack = find.descendant(
+        of: find.byType(ZoneVolumeSlider).last,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is GestureDetector &&
+              widget.onHorizontalDragUpdate != null,
+        ),
+      );
+      await tester.tapAt(tester.getCenter(backTrack));
+      await tester.pump();
+      final focused = tester.widget<FestivalScene>(find.byType(FestivalScene));
+      expect(focused.focusedZone, FestivalZone.back);
+      expect(focused.focusedVolume, 50);
+      expect(tester.widget<ZoneControlCard>(cards.last).selected, isTrue);
 
       final stage = tester.widget<FestivalScene>(find.byType(FestivalScene));
       await tester.pump(festivalTick * (272 - stage.tick));

@@ -10,7 +10,7 @@ class FestivalRecords {
   final SharedPreferences _preferences;
   static const _volume = 'festival.volume';
   static const _vibration = 'festival.vibration';
-  static const _rehearsal = 'festival.guidedRehearsal.v1';
+  static const _rehearsal = 'festival.guidedRehearsal.v2';
   static const _concert = 'festival.concert.v1';
   static const _mastery = 'festival.mastery';
 

@@ -3,7 +3,14 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'festival_performance.dart';
 import 'performance_controls.dart';
+
+double _sceneY(double y, bool compact) {
+  if (!compact) return y;
+  if (y <= 178) return y * (135 / 178);
+  return 135 + (y - 178) * (130 / 146);
+}
 
 enum _Sprite {
   ground('festival/ground', 1774, 887, Rect.fromLTRB(30, 179, 1741, 707)),
@@ -142,6 +149,9 @@ class FestivalScene extends StatefulWidget {
     this.waveFrame,
     this.waveTowardBack = true,
     this.compact = false,
+    this.focusedZone,
+    this.focusedVolume,
+    this.onZoneSelected,
   });
 
   final int tick;
@@ -152,6 +162,9 @@ class FestivalScene extends StatefulWidget {
   final int? waveFrame;
   final bool waveTowardBack;
   final bool compact;
+  final FestivalZone? focusedZone;
+  final int? focusedVolume;
+  final ValueChanged<FestivalZone>? onZoneSelected;
 
   @override
   State<FestivalScene> createState() => _FestivalSceneState();
@@ -219,27 +232,67 @@ class _FestivalSceneState extends State<FestivalScene> {
     return Semantics(
       label: description,
       image: true,
+      explicitChildNodes: true,
       child: AspectRatio(
         aspectRatio: 360 / (widget.compact ? 265 : 324),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
           child: _failed
               ? const Center(child: Text('공연 장면을 불러오지 못했어요.'))
-              : CustomPaint(
-                  painter: _FestivalPainter(
-                    images: _images,
-                    tick: widget.tick,
-                    front: widget.front,
-                    back: widget.back,
-                    generatorRunning: widget.generatorRunning,
-                    signalQueued: widget.signalQueued,
-                    waveFrame: widget.waveFrame,
-                    waveTowardBack: widget.waveTowardBack,
-                    compact: widget.compact,
-                  ),
+              : Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CustomPaint(
+                      painter: _FestivalPainter(
+                        images: _images,
+                        tick: widget.tick,
+                        front: widget.front,
+                        back: widget.back,
+                        generatorRunning: widget.generatorRunning,
+                        signalQueued: widget.signalQueued,
+                        waveFrame: widget.waveFrame,
+                        waveTowardBack: widget.waveTowardBack,
+                        compact: widget.compact,
+                        focusedZone: widget.focusedZone,
+                        focusedVolume: widget.focusedVolume,
+                        canSelectAudience: widget.onZoneSelected != null,
+                      ),
+                    ),
+                    if (widget.onZoneSelected != null)
+                      LayoutBuilder(builder: _audienceTargets),
+                  ],
                 ),
         ),
       ),
+    );
+  }
+
+  Widget _audienceTargets(BuildContext context, BoxConstraints bounds) {
+    final scale = bounds.maxHeight / (widget.compact ? 265.0 : 324.0);
+    double canvasY(double y) => _sceneY(y, widget.compact) * scale;
+
+    Widget target(FestivalZone zone, String label, double top, double bottom) {
+      return Positioned(
+        left: 0,
+        top: canvasY(top),
+        width: bounds.maxWidth * .70,
+        height: canvasY(bottom) - canvasY(top),
+        child: Semantics(
+          button: true,
+          label: '$label 볼륨 조작으로 이동',
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => widget.onZoneSelected!(zone),
+          ),
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        target(FestivalZone.front, '앞줄', 181, 240),
+        target(FestivalZone.back, '뒷줄', 240, 324),
+      ],
     );
   }
 }
@@ -255,6 +308,9 @@ class _FestivalPainter extends CustomPainter {
     required this.waveFrame,
     required this.waveTowardBack,
     required this.compact,
+    required this.focusedZone,
+    required this.focusedVolume,
+    required this.canSelectAudience,
   }) : images = Map.of(images);
 
   final Map<_Sprite, ui.Image> images;
@@ -266,14 +322,13 @@ class _FestivalPainter extends CustomPainter {
   final int? waveFrame;
   final bool waveTowardBack;
   final bool compact;
+  final FestivalZone? focusedZone;
+  final int? focusedVolume;
+  final bool canSelectAudience;
 
   final _nearest = Paint()..filterQuality = FilterQuality.none;
 
-  double _y(double y) {
-    if (!compact) return y;
-    if (y <= 178) return y * (135 / 178);
-    return 135 + (y - 178) * (130 / 146);
-  }
+  double _y(double y) => _sceneY(y, compact);
 
   void _draw(
     Canvas canvas,
@@ -383,7 +438,13 @@ class _FestivalPainter extends CustomPainter {
     }
   }
 
-  void _zoneLabel(Canvas canvas, String label, Color color, Offset offset) {
+  void _zoneLabel(
+    Canvas canvas,
+    String label,
+    Color color,
+    Offset offset, {
+    required bool focused,
+  }) {
     offset = Offset(offset.dx, _y(offset.dy));
     final text = TextPainter(
       text: TextSpan(
@@ -406,10 +467,33 @@ class _FestivalPainter extends CustomPainter {
       box,
       Paint()
         ..color = color
+        ..strokeWidth = focused ? 2 : 1
         ..style = PaintingStyle.stroke,
     );
     text.paint(canvas, offset + const Offset(7, 4));
     text.dispose();
+  }
+
+  void _highlightAudience(Canvas canvas, FestivalZone zone) {
+    final frontRow = zone == FestivalZone.front;
+    final color = (frontRow ? front : back).color;
+    final shift = frontRow ? 0.0 : 64.0;
+    final outline = Path()
+      ..moveTo(66, _y(204 + shift))
+      ..lineTo(163, _y(185 + shift))
+      ..lineTo(243, _y(204 + shift))
+      ..lineTo(220, _y(229 + shift))
+      ..lineTo(128, _y(244 + shift))
+      ..lineTo(66, _y(226 + shift))
+      ..close();
+    canvas.drawPath(outline, Paint()..color = color.withAlpha(55));
+    canvas.drawPath(
+      outline,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = color.withAlpha(190),
+    );
   }
 
   @override
@@ -428,6 +512,7 @@ class _FestivalPainter extends CustomPainter {
         ),
     );
     _draw(canvas, _Sprite.ground, const Offset(176, 327), 149);
+    if (focusedZone case final zone?) _highlightAudience(canvas, zone);
     _draw(canvas, _Sprite.backdrop, const Offset(70, 123), 65);
     _draw(canvas, _Sprite.backdrop, const Offset(292, 123), 58, mirror: true);
     _draw(canvas, _Sprite.lighting, const Offset(39, 154), 103);
@@ -510,17 +595,23 @@ class _FestivalPainter extends CustomPainter {
       frontRow: false,
       zoneColor: const Color(0xFFFFC46A),
     );
+    final focusPercent = focusedVolume == null ? '' : ' $focusedVolume%';
+    final choose = canSelectAudience ? ' ›' : '';
+    final frontFocused = focusedZone == FestivalZone.front;
+    final backFocused = focusedZone == FestivalZone.back;
     _zoneLabel(
       canvas,
-      '앞줄 ${front.symbol}',
-      const Color(0xFF7CE0C2),
+      '앞줄 ${front.symbol}${frontFocused ? focusPercent : choose}',
+      frontFocused ? front.color : const Color(0xFF7CE0C2),
       const Offset(15, 189),
+      focused: frontFocused,
     );
     _zoneLabel(
       canvas,
-      '뒷줄 ${back.symbol}',
-      const Color(0xFFFFC46A),
+      '뒷줄 ${back.symbol}${backFocused ? focusPercent : choose}',
+      backFocused ? back.color : const Color(0xFFFFC46A),
       const Offset(15, 253),
+      focused: backFocused,
     );
     canvas.restore();
   }
@@ -534,6 +625,9 @@ class _FestivalPainter extends CustomPainter {
       generatorRunning != oldDelegate.generatorRunning ||
       waveFrame != oldDelegate.waveFrame ||
       waveTowardBack != oldDelegate.waveTowardBack ||
+      focusedZone != oldDelegate.focusedZone ||
+      focusedVolume != oldDelegate.focusedVolume ||
+      canSelectAudience != oldDelegate.canSelectAudience ||
       compact != oldDelegate.compact ||
       images.length != oldDelegate.images.length;
 }

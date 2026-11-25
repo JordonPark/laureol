@@ -6,6 +6,8 @@ const _ticksPerSecond = 8;
 const _interludeLength = 4 * _ticksPerSecond;
 const _joinGrace = 3 * _ticksPerSecond;
 const _frontProximityBoost = 14;
+const _readyMinimum = 56;
+const _readyMaximum = 68;
 const _generatorStopTick = 79 * _ticksPerSecond + _ticksPerBeat;
 
 enum FestivalZone { front, back }
@@ -303,7 +305,12 @@ class FestivalPerformance {
     if (seconds >= 48 && seconds < 50) return ('앞줄 체감 볼륨 증가', null);
     final chorus = _chorusAt(_tick);
     if (chorus != null && chorus.number == 1 && seconds < chorus.opens) {
-      return ('첫 후렴 · 두 줄을 ✓ 준비에 맞춰요', null);
+      final instruction = switch (_levels[FestivalZone.front.index]) {
+        CrowdStatus.quiet => '앞줄 볼륨을 올려 ✓ 준비에 맞춰요',
+        CrowdStatus.loud => '앞줄 볼륨을 내려 ✓ 준비에 맞춰요',
+        _ => _rearStatusHint ?? '두 줄 ✓ 준비 · 노란 신호를 기다려요',
+      };
+      return (instruction, null);
     }
     if (signalQueued) return ('신호 예약 · 박자에 맞춰 떼창이 시작돼요', null);
     if (chorus != null && _reserved == null && _isOpen(chorus)) {
@@ -356,6 +363,15 @@ class FestivalPerformance {
   };
 
   int volume(FestivalZone zone) => _volumes[zone.index];
+
+  ({int minimum, int maximum}) get rehearsalTarget {
+    final frontBleed = _volumes[FestivalZone.front.index] / 5;
+    return (
+      minimum: (_readyMinimum - frontBleed).ceil(),
+      maximum: (_readyMaximum - frontBleed).floor(),
+    );
+  }
+
   CrowdStatus status(FestivalZone zone) {
     final i = zone.index;
     return _singing[i] && _levels[i] == CrowdStatus.ready
@@ -478,10 +494,14 @@ class FestivalPerformance {
       0,
       100,
     );
-    final margin = _levels[index] == CrowdStatus.ready ? 2 : 0;
-    return heard < 56 - margin
+    final margin =
+        _levels[index] == CrowdStatus.ready &&
+            (!preserveRehearsalMix || concertStarted)
+        ? 2
+        : 0;
+    return heard < _readyMinimum - margin
         ? CrowdStatus.quiet
-        : heard > 68 + margin
+        : heard > _readyMaximum + margin
         ? CrowdStatus.loud
         : CrowdStatus.ready;
   }
