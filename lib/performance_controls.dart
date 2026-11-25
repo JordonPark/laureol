@@ -33,6 +33,8 @@ enum SignalState {
   final String label;
 }
 
+enum MixCue { none, adjust, signal }
+
 class CrowdStatusBadge extends StatelessWidget {
   const CrowdStatusBadge({super.key, required this.status});
 
@@ -177,6 +179,22 @@ class ZoneVolumeSlider extends StatelessWidget {
                             height: 16,
                             child: const ColoredBox(color: _mint),
                           ),
+                        if (highlighted &&
+                            band != null &&
+                            (value < band.minimum || value > band.maximum))
+                          Positioned.fill(
+                            child: CustomPaint(
+                              painter: _VolumeCuePainter(
+                                from: filled + thumb / 2,
+                                toward:
+                                    (band.minimum + band.maximum) /
+                                        2 *
+                                        track /
+                                        100 +
+                                    thumb / 2,
+                              ),
+                            ),
+                          ),
                         Positioned(
                           left: filled,
                           width: thumb,
@@ -202,26 +220,61 @@ class ZoneVolumeSlider extends StatelessWidget {
   }
 }
 
+class _VolumeCuePainter extends CustomPainter {
+  const _VolumeCuePainter({required this.from, required this.toward});
+
+  final double from;
+  final double toward;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final direction = toward > from ? 1 : -1;
+    final center = (from + toward) / 2;
+    final paint = Paint()
+      ..color = _mint
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    for (final shift in [-4, 4]) {
+      final x = (center + shift).clamp(5.0, size.width - 5);
+      final mark = Path()
+        ..moveTo(x - 2 * direction, 2)
+        ..lineTo(x + 2 * direction, 6)
+        ..lineTo(x - 2 * direction, 10);
+      canvas.drawPath(mark, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _VolumeCuePainter oldDelegate) =>
+      from != oldDelegate.from || toward != oldDelegate.toward;
+}
+
 class SignalButton extends StatelessWidget {
   const SignalButton({
     super.key,
     required this.state,
     this.onPressed,
     this.label,
+    this.destination,
+    this.beatPhase = 0,
   });
 
   final SignalState state;
   final VoidCallback? onPressed;
   final String? label;
+  final String? destination;
+  final double beatPhase;
 
   @override
   Widget build(BuildContext context) {
     final action = state == SignalState.available ? onPressed : null;
     final text = label ?? state.label;
+    final phase = MediaQuery.disableAnimationsOf(context) ? 0.0 : beatPhase;
     return Semantics(
       button: true,
       enabled: action != null,
-      label: text,
+      label: destination == null ? text : '$text $destination',
       onTap: action,
       child: ExcludeSemantics(
         child: GestureDetector(
@@ -235,20 +288,61 @@ class SignalButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: action == null ? _line : _amber,
               borderRadius: BorderRadius.circular(8),
+              border: action == null
+                  ? null
+                  : Border.all(
+                      width: 2,
+                      color: Color.lerp(
+                        const Color(0xFFFFF1C4),
+                        _amber,
+                        phase,
+                      )!,
+                    ),
             ),
-            child: Text(
-              text,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: action == null ? _ink : _panel,
-                fontWeight: FontWeight.w800,
-              ),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              children: [
+                if (action != null)
+                  const CustomPaint(size: Size(12, 12), painter: _SignalMark()),
+                Text(
+                  text,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: action == null ? _ink : _panel,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (destination case final zone?)
+                  Text(
+                    zone,
+                    style: const TextStyle(color: _panel, fontSize: 13),
+                  ),
+              ],
             ),
           ),
         ),
       ),
     );
   }
+}
+
+class _SignalMark extends CustomPainter {
+  const _SignalMark();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final mark = Path()
+      ..moveTo(2, 0)
+      ..lineTo(size.width, size.height / 2)
+      ..lineTo(2, size.height)
+      ..close();
+    canvas.drawPath(mark, Paint()..color = _panel);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SignalMark oldDelegate) => false;
 }
 
 class BeatStrip extends StatelessWidget {
@@ -504,8 +598,8 @@ class ZoneControlCard extends StatelessWidget {
     required this.status,
     required this.volume,
     required this.onVolumeChanged,
-    required this.signalState,
-    this.onSignal,
+    required this.target,
+    required this.cue,
     this.compact = false,
     this.selected = false,
     this.needsRescue = false,
@@ -515,8 +609,8 @@ class ZoneControlCard extends StatelessWidget {
   final CrowdStatus status;
   final int volume;
   final ValueChanged<int> onVolumeChanged;
-  final SignalState signalState;
-  final VoidCallback? onSignal;
+  final ({int minimum, int maximum}) target;
+  final MixCue cue;
   final bool compact;
   final bool selected;
   final bool needsRescue;
@@ -529,6 +623,10 @@ class ZoneControlCard extends StatelessWidget {
         color: _panel,
         border: Border.all(
           color: needsRescue
+              ? _amber
+              : cue == MixCue.adjust
+              ? _mint
+              : cue == MixCue.signal
               ? _amber
               : selected
               ? status.color
@@ -554,8 +652,9 @@ class ZoneControlCard extends StatelessWidget {
             zone: zone,
             value: volume,
             onChanged: onVolumeChanged,
+            highlighted: cue == MixCue.adjust,
+            target: target,
           ),
-          SignalButton(state: signalState, onPressed: onSignal),
         ],
       ),
     );

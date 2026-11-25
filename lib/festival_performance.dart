@@ -11,6 +11,7 @@ const _readyMaximum = 68;
 const _generatorStopTick = 79 * _ticksPerSecond + _ticksPerBeat;
 const _rescueBeats = 2;
 const _rewindTicks = 3 * _ticksPerSecond;
+const comboEffectTicks = 12;
 
 enum FestivalZone { front, back }
 
@@ -241,6 +242,7 @@ class FestivalPerformance {
   int _leadBeats = 0;
   int _combo = 0;
   int _bestCombo = 0;
+  ({int count, int tick})? _comboMilestone;
   int _togetherStreak = 0;
   int _bestTogetherStreak = 0;
   bool _marketMissionDone = false;
@@ -270,6 +272,14 @@ class FestivalPerformance {
       : combo >= 10
       ? 1
       : 0;
+  ({int count, int elapsedTicks})? get comboEffect {
+    final milestone = _comboMilestone;
+    if (milestone == null || _tick - milestone.tick >= comboEffectTicks) {
+      return null;
+    }
+    return (count: milestone.count, elapsedTicks: _tick - milestone.tick);
+  }
+
   ComboBreak? get comboBreak => _comboBreak;
   bool get recoverySucceeded => _recoverySucceeded;
   bool get missionAchieved => switch (venue) {
@@ -503,12 +513,44 @@ class FestivalPerformance {
 
   int volume(FestivalZone zone) => _volumes[zone.index];
 
-  ({int minimum, int maximum}) get rehearsalTarget {
-    final frontBleed = _volumes[FestivalZone.front.index] / 5;
+  ({int minimum, int maximum}) readyVolumeRange(FestivalZone zone) {
+    final spill = _volumes[1 - zone.index] / 5 + _volumeModifier(zone);
     return (
-      minimum: (_readyMinimum - frontBleed).ceil(),
-      maximum: (_readyMaximum - frontBleed).floor(),
+      minimum: (_readyMinimum - spill).ceil(),
+      maximum: (_readyMaximum - spill).floor(),
     );
+  }
+
+  FestivalZone? get recommendedSignalZone {
+    const front = FestivalZone.front;
+    const back = FestivalZone.back;
+    if (signal(front) != SignalState.available) return null;
+    if (startsBothRows(back) || _levels[front.index] != CrowdStatus.ready) {
+      return _levels[back.index] == CrowdStatus.ready ? back : null;
+    }
+    return front;
+  }
+
+  SignalState get sharedSignal =>
+      signal(_reserved ?? recommendedSignalZone ?? FestivalZone.front);
+
+  bool startsBothRows(FestivalZone zone) =>
+      zone == FestivalZone.back &&
+      _chorusAt(_tick)?.number == 3 &&
+      _tick >= _generatorEnd &&
+      _levels.every((level) => level == CrowdStatus.ready);
+
+  double get beatPhase => (_tick % _ticksPerBeat) / _ticksPerBeat;
+
+  MixCue cueFor(FestivalZone zone) {
+    if (finished || seconds >= _choruses.last.end) return MixCue.none;
+    if (_levels[zone.index] != CrowdStatus.ready) return MixCue.adjust;
+    final signalZone = recommendedSignalZone;
+    return signalZone == zone ||
+            (signalZone == FestivalZone.back &&
+                startsBothRows(FestivalZone.back))
+        ? MixCue.signal
+        : MixCue.none;
   }
 
   CrowdStatus status(FestivalZone zone) {
@@ -616,6 +658,9 @@ class FestivalPerformance {
       _joinedTogetherThisChorus = true;
       _clearRescue();
       _combo++;
+      if (_combo == 10 || _combo == 25 || _combo == 40) {
+        _comboMilestone = (count: _combo, tick: _tick);
+      }
       if (_combo > _bestCombo) _bestCombo = _combo;
       _togetherStreak++;
       if (_togetherStreak > _bestTogetherStreak) {
@@ -699,17 +744,18 @@ class FestivalPerformance {
   }
 
   void _refreshLevels() {
-    for (var i = 0; i < 2; i++) {
-      final modifier = i == 0
-          ? (seconds >= 48 ? _frontProximityBoost : 0)
-          : (generatorRunning
-                ? -16
-                : _marketNoise
-                ? -10
-                : 0);
-      _levels[i] = _levelFor(i, modifier);
+    for (final zone in FestivalZone.values) {
+      _levels[zone.index] = _levelFor(zone.index, _volumeModifier(zone));
     }
   }
+
+  int _volumeModifier(FestivalZone zone) => zone == FestivalZone.front
+      ? (seconds >= 48 ? _frontProximityBoost : 0)
+      : generatorRunning
+      ? -16
+      : _marketNoise
+      ? -10
+      : 0;
 
   CrowdStatus _levelFor(int index, int modifier) {
     final heard = (_volumes[index] + _volumes[1 - index] / 5 + modifier).clamp(
@@ -746,10 +792,7 @@ class FestivalPerformance {
     if (_tick < chorus.start * _ticksPerSecond) return;
     if (_tick == _reservedTick) {
       _signalSucceeded = _levels[_reserved!.index] == CrowdStatus.ready;
-      if (chorus.number == 3 &&
-          _reserved == FestivalZone.back &&
-          _tick >= _generatorEnd &&
-          _levels.every((level) => level == CrowdStatus.ready)) {
+      if (startsBothRows(_reserved!)) {
         _transferReady = true;
       }
       _cues.add((FestivalCue.call, _tick));

@@ -882,6 +882,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   FestivalScene _scene({required bool compact}) {
     final performance = _performance;
     final zone = _focusedZone;
+    final rehearsal = _rehearsalStep;
     return FestivalScene(
       compact: compact,
       tick: performance.tick,
@@ -896,6 +897,19 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       onZoneSelected: _rehearsalStep == null ? _selectZone : null,
       venue: performance.venue,
       lightingTier: performance.lightingTier,
+      comboEffect: performance.comboEffect,
+      frontCue: rehearsal == null
+          ? performance.cueFor(FestivalZone.front)
+          : MixCue.none,
+      backCue: switch (rehearsal) {
+        _RehearsalStep.volume =>
+          performance.status(FestivalZone.back) == CrowdStatus.ready
+              ? MixCue.none
+              : MixCue.adjust,
+        _RehearsalStep.signal => MixCue.signal,
+        _RehearsalStep.response => MixCue.none,
+        null => performance.cueFor(FestivalZone.back),
+      },
       readyPulse: _readyPulse,
       readyZones: _readyZones,
     );
@@ -970,7 +984,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
                   value: _performance.volume(FestivalZone.back),
                   enabled: step == _RehearsalStep.volume,
                   highlighted: step == _RehearsalStep.volume,
-                  target: _performance.rehearsalTarget,
+                  target: _performance.readyVolumeRange(FestivalZone.back),
                   onChanged: (value) => _changeVolume(FestivalZone.back, value),
                   onInteractionEnd: _finishVolumePractice,
                 ),
@@ -1069,13 +1083,29 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         selected: _focusedZone == zone,
         needsRescue: performance.needsRescue(zone),
         onVolumeChanged: (value) => _changeVolume(zone, value),
-        signalState: performance.signal(zone),
-        onSignal: () => _sendSignal(zone),
+        target: performance.readyVolumeRange(zone),
+        cue: performance.cueFor(zone),
       );
     }
 
     final front = card(FestivalZone.front, '앞줄');
     final back = card(FestivalZone.back, '뒷줄');
+    final signalZone = performance.recommendedSignalZone;
+    final signalState = performance.sharedSignal;
+    final signal = SignalButton(
+      state: signalState,
+      label: signalState == SignalState.available && signalZone == null
+          ? '볼륨 맞추기'
+          : null,
+      destination: switch (signalZone) {
+        FestivalZone.front => '앞줄',
+        FestivalZone.back =>
+          performance.startsBothRows(FestivalZone.back) ? '두 줄' : '뒷줄',
+        null => null,
+      },
+      beatPhase: performance.beatPhase,
+      onPressed: signalZone == null ? null : () => _sendSignal(signalZone),
+    );
 
     final scene = _scene(compact: compact);
     final stage = compact
@@ -1107,7 +1137,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       combo: performance.combo,
       holdingCombo: performance.holdingCombo,
     );
-    final controls = LayoutBuilder(
+    final sliders = LayoutBuilder(
       builder: (context, constraints) {
         final largeText = MediaQuery.textScalerOf(context).scale(14) > 20;
         if (constraints.maxWidth < 280 || largeText) {
@@ -1125,6 +1155,10 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
           ],
         );
       },
+    );
+    final controls = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [sliders, const SizedBox(height: 8), signal],
     );
 
     return _Screen(

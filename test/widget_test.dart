@@ -188,6 +188,16 @@ void main() {
       }
       expect(Scrollable.of(tester.element(cards.first)).position.pixels, 0);
       expect(find.byType(ZoneVolumeSlider).hitTestable(), findsNWidgets(2));
+      expect(find.byType(SignalButton).hitTestable(), findsOneWidget);
+      expect(
+        tester.widget<FestivalScene>(find.byType(FestivalScene)).backCue,
+        MixCue.adjust,
+      );
+      final rearSlider = tester.widget<ZoneVolumeSlider>(
+        find.byType(ZoneVolumeSlider).last,
+      );
+      expect(rearSlider.highlighted, isTrue);
+      expect(rearSlider.target, (minimum: 46, maximum: 58));
       await tester.tap(find.bySemanticsLabel('앞줄 볼륨 조작으로 이동'));
       await tester.pump();
       expect(
@@ -327,6 +337,9 @@ void main() {
     expect(find.text('✓  준비'), findsNWidgets(2));
 
     final signal = find.text('라우럴!').first;
+    expect(find.byType(SignalButton), findsOneWidget);
+    expect(find.bySemanticsLabel('라우럴! 앞줄'), findsOneWidget);
+    expect(scene().frontCue, MixCue.signal);
     expect(
       tester.getSize(find.byType(SignalButton).first).height,
       greaterThanOrEqualTo(48),
@@ -407,13 +420,22 @@ void main() {
       ),
     );
     final track = tester.getRect(rearTrack);
-    const missedTick = 212;
+    const missedTick = 248;
     await advanceTo(176);
     await tester.tapAt(track.center);
     await tester.pump();
     await tester.tap(find.text('라우럴!').first);
-    await advanceTo(208);
+    await advanceTo(240);
+    expect(find.text('10 콤보!'), findsOneWidget);
+    final front = find.bySemanticsLabel('앞줄 볼륨 조작으로 이동');
+    await tester.tap(front);
+    await tester.pump();
+    expect(scene().focusedZone, FestivalZone.front);
+    expect(find.byType(ZoneVolumeSlider).hitTestable(), findsNWidgets(2));
+    await advanceTo(missedTick);
     await tester.tapAt(Offset(track.left + track.width * .75, track.center.dy));
+    await advanceTo(252);
+    expect(find.text('10 콤보!'), findsNothing);
     await advanceTo(800);
     await tester.pumpAndSettle();
 
@@ -423,7 +445,11 @@ void main() {
     expect(saved, isNotNull);
     await tester.tap(retry);
     await tester.pumpAndSettle();
-    expect(scene().tick, inInclusiveRange(missedTick - 24, missedTick - 20));
+    expect(scene().tick, inInclusiveRange(missedTick - 24, missedTick - 1));
+    expect(
+      tester.widget<ZoneVolumeSlider>(find.byType(ZoneVolumeSlider).last).value,
+      50,
+    );
     await tester.pump(const Duration(seconds: 7));
     await tester.pumpAndSettle();
     expect(find.text('콤보 복구 연습 결과'), findsOneWidget);

@@ -154,6 +154,9 @@ class FestivalScene extends StatefulWidget {
     this.onZoneSelected,
     this.venue = FestivalVenue.neighborhood,
     this.lightingTier = 0,
+    this.comboEffect,
+    this.frontCue = MixCue.none,
+    this.backCue = MixCue.none,
     this.readyPulse = 0,
     this.readyZones = 0,
   });
@@ -171,6 +174,9 @@ class FestivalScene extends StatefulWidget {
   final ValueChanged<FestivalZone>? onZoneSelected;
   final FestivalVenue venue;
   final int lightingTier;
+  final ({int count, int elapsedTicks})? comboEffect;
+  final MixCue frontCue;
+  final MixCue backCue;
   final int readyPulse;
   final int readyZones;
 
@@ -274,6 +280,8 @@ class _FestivalSceneState extends State<FestivalScene> {
                           canSelectAudience: widget.onZoneSelected != null,
                           venue: widget.venue,
                           lightingTier: widget.lightingTier,
+                          frontCue: widget.frontCue,
+                          backCue: widget.backCue,
                           readyZones: widget.readyZones,
                           pulseProgress: progress,
                         ),
@@ -281,6 +289,11 @@ class _FestivalSceneState extends State<FestivalScene> {
                     ),
                     if (widget.onZoneSelected != null)
                       LayoutBuilder(builder: _audienceTargets),
+                    if (widget.comboEffect case final celebration?)
+                      _ComboCelebration(
+                        count: celebration.count,
+                        progress: celebration.elapsedTicks / comboEffectTicks,
+                      ),
                   ],
                 ),
         ),
@@ -318,6 +331,109 @@ class _FestivalSceneState extends State<FestivalScene> {
   }
 }
 
+class _ComboCelebration extends StatelessWidget {
+  const _ComboCelebration({required this.count, required this.progress});
+
+  final int count;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final accent = switch (count) {
+      10 => const Color(0xFF7CE0C2),
+      25 => const Color(0xFFFFC46A),
+      _ => const Color(0xFFFF9EDA),
+    };
+    final fade = (1 - (progress - .7) / .3).clamp(0.0, 1.0);
+    return IgnorePointer(
+      child: ExcludeSemantics(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (!reducedMotion)
+              CustomPaint(
+                painter: _ComboWavePainter(color: accent, progress: progress),
+              ),
+            Align(
+              alignment: const Alignment(0, -.84),
+              child: Opacity(
+                opacity: reducedMotion ? 1 : fade,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xF21B1529),
+                    border: Border.all(color: accent, width: 2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 3,
+                    ),
+                    child: Text(
+                      '$count 콤보!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: accent,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ComboWavePainter extends CustomPainter {
+  const _ComboWavePainter({required this.color, required this.progress});
+
+  final Color color;
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final origin = Offset(size.width / 2, size.height * .49);
+    final range = size.width * (.19 + progress * .31);
+    final paint = Paint()
+      ..color = color.withAlpha(((1 - progress) * 216).round());
+    for (var i = 0; i < 9; i++) {
+      final x = (i - 4) / 4;
+      final rise = (i.isEven ? .16 : .09) + (1 - x.abs()) * .13;
+      final point = origin + Offset(x * range, -size.height * rise * progress);
+      final spark = i.isEven ? 4.0 : 3.0;
+      canvas.drawRect(
+        Rect.fromCenter(center: point, width: spark, height: spark),
+        paint,
+      );
+    }
+    final spread = size.height * progress;
+    final wave = Path()
+      ..moveTo(origin.dx - range, origin.dy + spread * .11)
+      ..quadraticBezierTo(
+        origin.dx,
+        origin.dy + size.height * .13 + spread * .36,
+        origin.dx + range,
+        origin.dy + spread * .11,
+      );
+    canvas.drawPath(
+      wave,
+      paint
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ComboWavePainter oldDelegate) =>
+      color != oldDelegate.color || progress != oldDelegate.progress;
+}
+
 class _FestivalPainter extends CustomPainter {
   _FestivalPainter({
     required Map<_Sprite, ui.Image> images,
@@ -334,6 +450,8 @@ class _FestivalPainter extends CustomPainter {
     required this.canSelectAudience,
     required this.venue,
     required this.lightingTier,
+    required this.frontCue,
+    required this.backCue,
     required this.readyZones,
     required this.pulseProgress,
   }) : images = Map.of(images);
@@ -352,6 +470,8 @@ class _FestivalPainter extends CustomPainter {
   final bool canSelectAudience;
   final FestivalVenue venue;
   final int lightingTier;
+  final MixCue frontCue;
+  final MixCue backCue;
   final int readyZones;
   final double pulseProgress;
 
@@ -503,9 +623,7 @@ class _FestivalPainter extends CustomPainter {
     text.dispose();
   }
 
-  void _highlightAudience(Canvas canvas, FestivalZone zone) {
-    final frontRow = zone == FestivalZone.front;
-    final color = (frontRow ? front : back).color;
+  void _highlightAudience(Canvas canvas, bool frontRow, Color color) {
     final shift = frontRow ? 0.0 : 64.0;
     final outline = Path()
       ..moveTo(66, _y(204 + shift))
@@ -524,6 +642,18 @@ class _FestivalPainter extends CustomPainter {
         ..color = color.withAlpha(190),
     );
   }
+
+  Color _zoneColor(MixCue cue, Color idle) => switch (cue) {
+    MixCue.adjust => const Color(0xFF7CE0C2),
+    MixCue.signal => const Color(0xFFFFC46A),
+    MixCue.none => idle,
+  };
+
+  String _zoneMark(MixCue cue, CrowdStatus status) => switch (cue) {
+    MixCue.adjust => status == CrowdStatus.quiet ? '››' : '‹‹',
+    MixCue.signal => '▶',
+    MixCue.none => status.symbol,
+  };
 
   void _drawReadyPulse(Canvas canvas) {
     if (readyZones == 0 || pulseProgress >= 1) return;
@@ -595,7 +725,14 @@ class _FestivalPainter extends CustomPainter {
         ),
     );
     _draw(canvas, _Sprite.ground, const Offset(176, 327), 149);
-    if (focusedZone case final zone?) _highlightAudience(canvas, zone);
+    final frontFocused = focusedZone == FestivalZone.front;
+    final backFocused = focusedZone == FestivalZone.back;
+    if (frontFocused || frontCue != MixCue.none) {
+      _highlightAudience(canvas, true, _zoneColor(frontCue, front.color));
+    }
+    if (backFocused || backCue != MixCue.none) {
+      _highlightAudience(canvas, false, _zoneColor(backCue, back.color));
+    }
     _draw(canvas, _Sprite.backdrop, const Offset(70, 123), 65);
     _draw(canvas, _Sprite.backdrop, const Offset(292, 123), 58, mirror: true);
     _draw(canvas, _Sprite.lighting, const Offset(39, 154), 103);
@@ -682,21 +819,22 @@ class _FestivalPainter extends CustomPainter {
     final focusPercent = focusedVolume == null ? '' : ' $focusedVolume%';
     final choose = canSelectAudience ? ' ›' : '';
     _drawReadyPulse(canvas);
-    final frontFocused = focusedZone == FestivalZone.front;
-    final backFocused = focusedZone == FestivalZone.back;
     _zoneLabel(
       canvas,
-      '앞줄 ${front.symbol}${frontFocused ? focusPercent : choose}',
-      frontFocused ? front.color : const Color(0xFF7CE0C2),
+      '앞줄 ${_zoneMark(frontCue, front)}${frontFocused ? focusPercent : choose}',
+      _zoneColor(
+        frontCue,
+        frontFocused ? front.color : const Color(0xFF7CE0C2),
+      ),
       const Offset(15, 189),
-      focused: frontFocused,
+      focused: frontFocused || frontCue != MixCue.none,
     );
     _zoneLabel(
       canvas,
-      '뒷줄 ${back.symbol}${backFocused ? focusPercent : choose}',
-      backFocused ? back.color : const Color(0xFFFFC46A),
+      '뒷줄 ${_zoneMark(backCue, back)}${backFocused ? focusPercent : choose}',
+      _zoneColor(backCue, backFocused ? back.color : const Color(0xFFFFC46A)),
       const Offset(15, 253),
-      focused: backFocused,
+      focused: backFocused || backCue != MixCue.none,
     );
     canvas.restore();
   }
@@ -714,6 +852,8 @@ class _FestivalPainter extends CustomPainter {
       focusedVolume != oldDelegate.focusedVolume ||
       canSelectAudience != oldDelegate.canSelectAudience ||
       lightingTier != oldDelegate.lightingTier ||
+      frontCue != oldDelegate.frontCue ||
+      backCue != oldDelegate.backCue ||
       readyZones != oldDelegate.readyZones ||
       pulseProgress != oldDelegate.pulseProgress ||
       venue != oldDelegate.venue ||

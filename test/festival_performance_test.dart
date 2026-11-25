@@ -13,6 +13,9 @@ void main() {
     const back = FestivalZone.back;
     _at(performance, 22);
     expect(performance.remainingBeats, 4);
+    expect(performance.recommendedSignalZone, front);
+    expect(performance.cueFor(back), MixCue.adjust);
+    expect(performance.readyVolumeRange(back), (minimum: 46, maximum: 58));
     performance.setVolume(back, 50);
     expect(performance.takeRecentCues(), [FestivalCue.applause]);
     performance.queue(front);
@@ -31,6 +34,12 @@ void main() {
     expect(performance.status(back), CrowdStatus.singing);
     expect(performance.waveFrame, 0);
     expect(performance.score, 1);
+    _at(performance, 30);
+    expect(performance.comboEffect, (count: 10, elapsedTicks: 0));
+    _at(performance, 31);
+    expect(performance.comboEffect, (count: 10, elapsedTicks: 8));
+    _at(performance, 31.5);
+    expect(performance.comboEffect, isNull);
     _at(performance, 34);
     expect(performance.chorusScores, [28, 0, 0]);
   });
@@ -82,6 +91,8 @@ void main() {
     _at(performance, 53.5);
     expect(performance.combo, 19);
     expect(performance.holdingCombo, isFalse);
+    _at(performance, 56.5);
+    expect(performance.comboEffect, (count: 25, elapsedTicks: 0));
     _at(performance, 62);
     expect(performance.eventNotice.$1, startsWith('후렴 2 · 함께 떼창'));
     expect(performance.nextSignalCountdown, (
@@ -104,6 +115,7 @@ void main() {
     performance.queue(front);
     _at(performance, 83);
     expect(performance.lightingTier, 3);
+    expect(performance.comboEffect, (count: 40, elapsedTicks: 0));
   });
 
   test('A missed beat ends the combo after the next chorus grace period', () {
@@ -212,6 +224,10 @@ void main() {
     _at(performance, 79.5);
     expect(performance.takeRecentCues(), [FestivalCue.generatorStop]);
     expect(performance.generatorRunning, isFalse);
+    expect(performance.recommendedSignalZone, FestivalZone.back);
+    expect(performance.startsBothRows(FestivalZone.back), isTrue);
+    expect(performance.cueFor(FestivalZone.front), MixCue.signal);
+    expect(performance.cueFor(FestivalZone.back), MixCue.signal);
     expect(performance.status(FestivalZone.back), CrowdStatus.ready);
     _at(performance, 82.5);
     expect(performance.status(FestivalZone.back), CrowdStatus.ready);
