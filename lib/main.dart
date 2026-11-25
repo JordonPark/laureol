@@ -30,7 +30,7 @@ const _mint = Color(0xFF7CE0C2);
 const _uiFont = 'Laureol Sans';
 const _titleArt = 'docs/art/festival/title-festival.png';
 const _playGuide =
-    '볼륨을 밀어 앞줄·뒷줄을 ✓ 준비에 맞춰요.\n'
+    '무대 양옆에서 볼륨을 위아래로 맞춰요.\n'
     '노란 ‘라우럴!’ 버튼이 켜지면 신호를 보내요.\n'
     '두 줄이 함께 부르면 콤보가 이어져요.';
 
@@ -545,8 +545,6 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   FestivalZone? _focusedZone;
   int _readyPulse = 0;
   int _readyZones = 0;
-  final _frontControl = GlobalKey();
-  final _backControl = GlobalKey();
 
   bool get _waitingForRehearsalInput =>
       _rehearsalStep == _RehearsalStep.volume ||
@@ -633,19 +631,6 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
 
   void _selectZone(FestivalZone zone) {
     setState(() => _focusedZone = zone);
-    final control = zone == FestivalZone.front ? _frontControl : _backControl;
-    final target = control.currentContext;
-    if (target != null) {
-      unawaited(
-        Scrollable.ensureVisible(
-          target,
-          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
-        ),
-      );
-    }
   }
 
   Future<bool> _saveResult() async {
@@ -883,6 +868,37 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     final performance = _performance;
     final zone = _focusedZone;
     final rehearsal = _rehearsalStep;
+    const front = FestivalZone.front;
+    const back = FestivalZone.back;
+    final frontCue = rehearsal == null
+        ? performance.cueFor(front)
+        : MixCue.none;
+    final backCue = switch (rehearsal) {
+      _RehearsalStep.volume =>
+        performance.status(back) == CrowdStatus.ready
+            ? MixCue.none
+            : MixCue.adjust,
+      _RehearsalStep.signal => MixCue.signal,
+      _RehearsalStep.response => MixCue.none,
+      null => performance.cueFor(back),
+    };
+    ZoneControlCard fader(FestivalZone zone, String label, MixCue cue) {
+      return ZoneControlCard(
+        zone: label,
+        status: performance.status(zone),
+        volume: performance.volume(zone),
+        selected: _focusedZone == zone,
+        needsRescue: performance.needsRescue(zone),
+        onVolumeChanged: (value) => _changeVolume(zone, value),
+        target: performance.readyVolumeRange(zone),
+        cue: cue,
+        enabled: rehearsal == null || rehearsal == _RehearsalStep.volume,
+        onInteractionEnd: rehearsal == _RehearsalStep.volume
+            ? _finishVolumePractice
+            : null,
+      );
+    }
+
     return FestivalScene(
       compact: compact,
       tick: performance.tick,
@@ -898,18 +914,10 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       venue: performance.venue,
       lightingTier: performance.lightingTier,
       comboEffect: performance.comboEffect,
-      frontCue: rehearsal == null
-          ? performance.cueFor(FestivalZone.front)
-          : MixCue.none,
-      backCue: switch (rehearsal) {
-        _RehearsalStep.volume =>
-          performance.status(FestivalZone.back) == CrowdStatus.ready
-              ? MixCue.none
-              : MixCue.adjust,
-        _RehearsalStep.signal => MixCue.signal,
-        _RehearsalStep.response => MixCue.none,
-        null => performance.cueFor(FestivalZone.back),
-      },
+      frontCue: frontCue,
+      backCue: backCue,
+      frontControl: rehearsal == null ? fader(front, '앞줄', frontCue) : null,
+      backControl: fader(back, '뒷줄', backCue),
       readyPulse: _readyPulse,
       readyZones: _readyZones,
     );
@@ -924,7 +932,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         switch (status) {
           CrowdStatus.loud => '너무 커요. 손잡이를 민트색 구간으로 내려요.',
           CrowdStatus.ready => '✓ 준비! 여기서 손을 떼세요.',
-          _ => '노란 손잡이를 민트색 ✓ 준비 구간에 놓으세요.',
+          _ => '오른쪽 손잡이를 위로 밀어 민트색 선에 맞춰요.',
         },
       ),
       _RehearsalStep.signal => ('이제 관객에게 신호를 보내요', '아래 노란 라우럴!을 누르고 뒷줄을 보세요.'),
@@ -953,66 +961,19 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         ),
         const SizedBox(height: 6),
         Text(instruction, style: const TextStyle(color: _paper)),
-        const SizedBox(height: 14),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: const Color(0xFF272039),
-            border: Border.all(color: status.color),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 4,
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    const Text(
-                      '뒷줄 관객',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    CrowdStatusBadge(status: status),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ZoneVolumeSlider(
-                  zone: '뒷줄',
-                  value: _performance.volume(FestivalZone.back),
-                  enabled: step == _RehearsalStep.volume,
-                  highlighted: step == _RehearsalStep.volume,
-                  target: _performance.readyVolumeRange(FestivalZone.back),
-                  onChanged: (value) => _changeVolume(FestivalZone.back, value),
-                  onInteractionEnd: _finishVolumePractice,
-                ),
-                if (step == _RehearsalStep.volume)
-                  const Text(
-                    '✓ 준비 구간',
-                    style: TextStyle(color: _mint, fontSize: 13),
-                  ),
-                if (step != _RehearsalStep.volume) ...[
-                  const SizedBox(height: 6),
-                  SignalButton(
-                    state: _performance.signal(FestivalZone.back),
-                    label: step == _RehearsalStep.response ? '본 공연 준비 중' : null,
-                    onPressed: () => _sendSignal(FestivalZone.back),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
       ],
+    );
+    final signal = SignalButton(
+      state: _performance.signal(FestivalZone.back),
+      label: step == _RehearsalStep.response ? '본 공연 준비 중' : null,
+      onPressed: () => _sendSignal(FestivalZone.back),
     );
     final visual = Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: math.max(
-            110,
-            math.min(260, bodyHeight - (wide ? 22 : 310)),
+            175,
+            math.min(285, bodyHeight - (wide ? 14 : 155)),
           ),
         ),
         child: _scene(compact: true),
@@ -1028,13 +989,23 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: panel),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        panel,
+                        if (step != _RehearsalStep.volume) ...[
+                          const SizedBox(height: 12),
+                          signal,
+                        ],
+                      ],
+                    ),
+                  ),
                   const SizedBox(width: 14),
                   Expanded(child: visual),
                 ],
               ),
             ]
-          : [panel, visual],
+          : [panel, visual, if (step != _RehearsalStep.volume) signal],
     );
   }
 
@@ -1056,10 +1027,10 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         safeWidth >= 600 &&
         viewport.maxWidth > viewport.maxHeight;
     final fullSceneHeight = (math.min(safeWidth, 520.0) - 32) * 324 / 360;
-    // Leave room for the score, notices, sliders, and shared signal button.
+    // Leave room for the score, rhythm cues, and shared signal button.
     final compact =
         standardText &&
-        (sideBySide || safeWidth <= 380 || bodyHeight < fullSceneHeight + 410);
+        (sideBySide || safeWidth <= 380 || bodyHeight < fullSceneHeight + 220);
     final title = widget.recovery != null
         ? '콤보 복구 연습'
         : chorus == null
@@ -1072,24 +1043,6 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       maximum: performance.maximum,
       compact: compact,
     );
-    ZoneControlCard card(FestivalZone zone, String label) {
-      final back = zone == FestivalZone.back;
-      return ZoneControlCard(
-        key: back ? _backControl : _frontControl,
-        zone: label,
-        compact: compact,
-        status: performance.status(zone),
-        volume: performance.volume(zone),
-        selected: _focusedZone == zone,
-        needsRescue: performance.needsRescue(zone),
-        onVolumeChanged: (value) => _changeVolume(zone, value),
-        target: performance.readyVolumeRange(zone),
-        cue: performance.cueFor(zone),
-      );
-    }
-
-    final front = card(FestivalZone.front, '앞줄');
-    final back = card(FestivalZone.back, '뒷줄');
     final signalZone = performance.recommendedSignalZone;
     final signalState = performance.sharedSignal;
     final signal = SignalButton(
@@ -1112,7 +1065,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         ? Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: math.max(120, bodyHeight - (sideBySide ? 20 : 310)),
+                maxHeight: math.max(175, bodyHeight - (sideBySide ? 14 : 183)),
               ),
               child: scene,
             ),
@@ -1136,31 +1089,9 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
           : '후렴 ${countdown.chorus} 신호까지 ${countdown.remaining}박',
       combo: performance.combo,
       holdingCombo: performance.holdingCombo,
+      beatPhase: performance.hasLiveRhythm ? performance.beatPhase : null,
+      signalReady: signalZone != null,
     );
-    final sliders = LayoutBuilder(
-      builder: (context, constraints) {
-        final largeText = MediaQuery.textScalerOf(context).scale(14) > 20;
-        if (constraints.maxWidth < 280 || largeText) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [front, const SizedBox(height: 8), back],
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: front),
-            const SizedBox(width: 8),
-            Expanded(child: back),
-          ],
-        );
-      },
-    );
-    final controls = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [sliders, const SizedBox(height: 8), signal],
-    );
-
     return _Screen(
       title: title,
       compact: compact,
@@ -1197,14 +1128,14 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
                         const SizedBox(height: 6),
                         beats,
                         const SizedBox(height: 6),
-                        controls,
+                        signal,
                       ],
                     ),
                   ),
                 ],
               ),
             ]
-          : [stage, if (!compact) score, cue, beats, controls],
+          : [stage, if (!compact) score, cue, beats, signal],
     );
   }
 }

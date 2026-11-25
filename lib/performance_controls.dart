@@ -7,12 +7,13 @@ const _line = Color(0xFF514866);
 const _amber = Color(0xFFFFC46A);
 const _mint = Color(0xFF7CE0C2);
 const _coral = Color(0xFFFFA18B);
+const _blue = Color(0xFF9CCEFF);
 
 enum CrowdStatus {
   quiet('작음', '귀 기울이기', '↓', _amber),
   ready('준비', '박수', '✓', _mint),
   loud('큼', '귀 막기', '↑', _coral),
-  singing('떼창', '함께 노래하기', '♪', _mint);
+  singing('떼창', '함께 노래하기', '♪', _blue);
 
   const CrowdStatus(this.label, this.description, this.symbol, this.color);
 
@@ -36,9 +37,14 @@ enum SignalState {
 enum MixCue { none, adjust, signal }
 
 class CrowdStatusBadge extends StatelessWidget {
-  const CrowdStatusBadge({super.key, required this.status});
+  const CrowdStatusBadge({
+    super.key,
+    required this.status,
+    this.compact = false,
+  });
 
   final CrowdStatus status;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -52,10 +58,17 @@ class CrowdStatusBadge extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 4 : 8,
+            vertical: compact ? 2 : 4,
+          ),
           child: Text(
             '${status.symbol}  ${status.label}',
-            style: TextStyle(color: status.color, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: status.color,
+              fontSize: compact ? 11 : null,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ),
@@ -71,6 +84,7 @@ class ZoneVolumeSlider extends StatelessWidget {
     required this.onChanged,
     this.enabled = true,
     this.highlighted = false,
+    this.vertical = false,
     this.target,
     this.onInteractionEnd,
   }) : assert(value >= 0 && value <= 100);
@@ -80,6 +94,7 @@ class ZoneVolumeSlider extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final bool enabled;
   final bool highlighted;
+  final bool vertical;
   final ({int minimum, int maximum})? target;
   final VoidCallback? onInteractionEnd;
 
@@ -109,22 +124,26 @@ class ZoneVolumeSlider extends StatelessWidget {
       child: ExcludeSemantics(
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '볼륨',
-                  style: TextStyle(color: highlighted ? _amber : _muted),
-                ),
-                Text('$value%', style: const TextStyle(color: _ink)),
-              ],
-            ),
+            if (!vertical)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '볼륨',
+                    style: TextStyle(color: highlighted ? _amber : _muted),
+                  ),
+                  Text('$value%', style: const TextStyle(color: _ink)),
+                ],
+              ),
             SizedBox(
-              height: 48,
+              height: vertical ? 88 : 48,
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   const thumb = 20.0;
-                  final track = constraints.maxWidth - thumb;
+                  final length = vertical
+                      ? constraints.maxHeight
+                      : constraints.maxWidth;
+                  final track = length - thumb;
                   if (track <= 0) return const SizedBox.shrink();
                   final filled = track * value / 100;
 
@@ -134,23 +153,18 @@ class ZoneVolumeSlider extends StatelessWidget {
                     );
                   }
 
-                  return GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTapDown: enabled
-                        ? (details) => update(details.localPosition.dx)
-                        : null,
-                    onTapUp: enabled && onInteractionEnd != null
-                        ? (_) => onInteractionEnd!()
-                        : null,
-                    onHorizontalDragStart: enabled
-                        ? (details) => update(details.localPosition.dx)
-                        : null,
-                    onHorizontalDragUpdate: enabled
-                        ? (details) => update(details.localPosition.dx)
-                        : null,
-                    onHorizontalDragEnd: enabled && onInteractionEnd != null
-                        ? (_) => onInteractionEnd!()
-                        : null,
+                  double position(Offset point) =>
+                      vertical ? length - point.dy : point.dx;
+                  void dragStart(DragStartDetails details) =>
+                      update(position(details.localPosition));
+                  void dragUpdate(DragUpdateDetails details) =>
+                      update(position(details.localPosition));
+                  final end = enabled && onInteractionEnd != null
+                      ? (DragEndDetails _) => onInteractionEnd!()
+                      : null;
+                  final graphics = SizedBox(
+                    width: length,
+                    height: 48,
                     child: Stack(
                       alignment: Alignment.centerLeft,
                       children: [
@@ -209,6 +223,30 @@ class ZoneVolumeSlider extends StatelessWidget {
                         ),
                       ],
                     ),
+                  );
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: enabled
+                        ? (details) => update(position(details.localPosition))
+                        : null,
+                    onTapUp: enabled && onInteractionEnd != null
+                        ? (_) => onInteractionEnd!()
+                        : null,
+                    onHorizontalDragStart: enabled && !vertical
+                        ? dragStart
+                        : null,
+                    onHorizontalDragUpdate: enabled && !vertical
+                        ? dragUpdate
+                        : null,
+                    onHorizontalDragEnd: vertical ? null : end,
+                    onVerticalDragStart: enabled && vertical ? dragStart : null,
+                    onVerticalDragUpdate: enabled && vertical
+                        ? dragUpdate
+                        : null,
+                    onVerticalDragEnd: vertical ? end : null,
+                    child: vertical
+                        ? RotatedBox(quarterTurns: 3, child: graphics)
+                        : graphics,
                   );
                 },
               ),
@@ -353,6 +391,8 @@ class BeatStrip extends StatelessWidget {
     this.label,
     this.combo = 0,
     this.holdingCombo = false,
+    this.beatPhase,
+    this.signalReady = false,
   }) : assert(total > 0 && remaining >= 0 && remaining <= total);
 
   final int remaining;
@@ -360,11 +400,12 @@ class BeatStrip extends StatelessWidget {
   final String? label;
   final int combo;
   final bool holdingCombo;
+  final double? beatPhase;
+  final bool signalReady;
 
   @override
   Widget build(BuildContext context) {
     final text = label ?? '남은 박 $remaining';
-    final segments = total > 6 ? 6 : total;
     final comboText = _comboLabel(combo, holdingCombo);
     return Semantics(
       label: combo == 0 ? text : '$text, $comboText',
@@ -386,19 +427,14 @@ class BeatStrip extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Row(
-            children: List.generate(
-              segments,
-              (index) => Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: ColoredBox(
-                    color: index * total < remaining * segments
-                        ? _amber
-                        : _line,
-                    child: const SizedBox(height: 5),
-                  ),
-                ),
+          SizedBox(
+            width: double.infinity,
+            height: 30,
+            child: CustomPaint(
+              painter: _RhythmTrack(
+                phase: beatPhase,
+                signalReady: signalReady,
+                reducedMotion: MediaQuery.disableAnimationsOf(context),
               ),
             ),
           ),
@@ -406,6 +442,66 @@ class BeatStrip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RhythmTrack extends CustomPainter {
+  const _RhythmTrack({
+    required this.phase,
+    required this.signalReady,
+    required this.reducedMotion,
+  });
+
+  final double? phase;
+  final bool signalReady;
+  final bool reducedMotion;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bounds = Offset.zero & size;
+    final lane = RRect.fromRectAndRadius(bounds, const Radius.circular(7));
+    canvas.drawRRect(lane, Paint()..color = const Color(0xFF24203A));
+    canvas.save();
+    canvas.clipRRect(lane);
+    final targetX = size.width * .82;
+    final centerY = size.height / 2;
+    final paint = Paint()..color = _line;
+    canvas.drawLine(Offset(8, centerY), Offset(size.width - 8, centerY), paint);
+    final beat = phase;
+    final accent = signalReady ? _amber : _mint;
+    if (beat != null) {
+      final spacing = size.width * .19;
+      final progress = reducedMotion ? 0.0 : beat;
+      for (var index = 0; index <= 4; index++) {
+        final x = targetX + (progress - index) * spacing;
+        final emphasis = index == 0 && (reducedMotion || beat == 0);
+        final side = emphasis ? 6.0 : 4.0;
+        final note = Path()
+          ..moveTo(x, centerY - side)
+          ..lineTo(x + side, centerY)
+          ..lineTo(x, centerY + side)
+          ..lineTo(x - side, centerY)
+          ..close();
+        canvas.drawPath(
+          note,
+          paint..color = accent.withAlpha(emphasis ? 255 : 160),
+        );
+      }
+    }
+    canvas.drawLine(
+      Offset(targetX, 3),
+      Offset(targetX, size.height - 3),
+      paint
+        ..strokeWidth = 2
+        ..color = beat == null ? _muted : accent,
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _RhythmTrack oldDelegate) =>
+      oldDelegate.phase != phase ||
+      oldDelegate.signalReady != signalReady ||
+      oldDelegate.reducedMotion != reducedMotion;
 }
 
 String _comboLabel(int count, bool holding) =>
@@ -600,7 +696,8 @@ class ZoneControlCard extends StatelessWidget {
     required this.onVolumeChanged,
     required this.target,
     required this.cue,
-    this.compact = false,
+    this.enabled = true,
+    this.onInteractionEnd,
     this.selected = false,
     this.needsRescue = false,
   });
@@ -611,50 +708,50 @@ class ZoneControlCard extends StatelessWidget {
   final ValueChanged<int> onVolumeChanged;
   final ({int minimum, int maximum}) target;
   final MixCue cue;
-  final bool compact;
+  final bool enabled;
+  final VoidCallback? onInteractionEnd;
   final bool selected;
   final bool needsRescue;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(compact ? 8 : 12),
+      width: 76,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
       decoration: BoxDecoration(
-        color: _panel,
+        color: const Color(0xED24203A),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      foregroundDecoration: BoxDecoration(
         border: Border.all(
-          color: needsRescue
-              ? _amber
-              : cue == MixCue.adjust
-              ? _mint
-              : cue == MixCue.signal
-              ? _amber
-              : selected
-              ? status.color
-              : _line,
+          color: status.color.withAlpha(selected || needsRescue ? 255 : 180),
+          width: 2,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             zone,
             style: const TextStyle(
               color: _ink,
-              fontSize: 16,
+              fontSize: 12,
               fontWeight: FontWeight.w800,
             ),
           ),
-          SizedBox(height: compact ? 2 : 6),
-          CrowdStatusBadge(status: status),
-          SizedBox(height: compact ? 4 : 12),
+          Text('$volume%', style: const TextStyle(color: _ink, fontSize: 12)),
           ZoneVolumeSlider(
             zone: zone,
             value: volume,
             onChanged: onVolumeChanged,
             highlighted: cue == MixCue.adjust,
             target: target,
+            vertical: true,
+            enabled: enabled,
+            onInteractionEnd: onInteractionEnd,
           ),
+          CrowdStatusBadge(status: status, compact: true),
         ],
       ),
     );

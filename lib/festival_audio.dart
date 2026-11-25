@@ -25,15 +25,24 @@ class FestivalAudio {
           'sfx/generator-stop.wav',
           volume * .36,
         ),
+      },
+      _warnings = {
+        1: _Clip('sfx/front-mix-warning.wav', volume * .52),
+        2: _Clip('sfx/back-mix-warning.wav', volume * .52),
+        3: _Clip('sfx/both-mix-warning.wav', volume * .52),
       };
 
   final _Clip _music;
   final _Clip _generator;
   final Map<FestivalCue, _Clip> _effects;
+  final Map<int, _Clip> _warnings;
   bool _running = false;
   bool _generatorPlaying = false;
   int _generation = 0;
   int _lastCheckedTick = 0;
+  FestivalPerformance? _warningPerformance;
+  int _heardWarnings = 0;
+  int _lastWarningTick = -8;
 
   Future<void> start(FestivalPerformance performance) async {
     final generation = ++_generation;
@@ -52,6 +61,9 @@ class FestivalAudio {
     update(performance);
     for (final effect in _effects.values) {
       unawaited(effect.prepare());
+    }
+    for (final warning in _warnings.values) {
+      unawaited(warning.prepare());
     }
     unawaited(_generator.prepare());
   }
@@ -78,10 +90,33 @@ class FestivalAudio {
     for (final cue in cues) {
       unawaited(_effects[cue]!.play(Duration.zero, current));
     }
+    _updateMixWarnings(performance, current);
     if (performance.tick - _lastCheckedTick >= 16) {
       _lastCheckedTick = performance.tick;
       unawaited(_music.correctDrift(() => performance.position, current));
     }
+  }
+
+  void _updateMixWarnings(
+    FestivalPerformance performance,
+    bool Function() current,
+  ) {
+    if (!identical(performance, _warningPerformance)) {
+      _warningPerformance = performance;
+      _heardWarnings = 0;
+      _lastWarningTick = performance.tick - 8;
+    }
+    final mask = performance.volumeWarningMask;
+    _heardWarnings &= mask;
+    final unheard = mask & ~_heardWarnings;
+    if (unheard == 0 ||
+        performance.beatPhase != 0 ||
+        performance.tick - _lastWarningTick < 8) {
+      return;
+    }
+    _heardWarnings |= unheard;
+    _lastWarningTick = performance.tick;
+    unawaited(_warnings[unheard]!.play(Duration.zero, current));
   }
 
   void pause() {
@@ -93,6 +128,9 @@ class FestivalAudio {
     for (final clip in _effects.values) {
       unawaited(clip.stop());
     }
+    for (final clip in _warnings.values) {
+      unawaited(clip.stop());
+    }
   }
 
   Future<void> dispose() {
@@ -102,6 +140,7 @@ class FestivalAudio {
       _music.dispose(),
       _generator.dispose(),
       for (final clip in _effects.values) clip.dispose(),
+      for (final clip in _warnings.values) clip.dispose(),
     ]);
   }
 }

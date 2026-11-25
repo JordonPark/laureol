@@ -554,6 +554,13 @@ class FestivalPerformance {
       _levels.every((level) => level == CrowdStatus.ready);
 
   double get beatPhase => (_tick % _ticksPerBeat) / _ticksPerBeat;
+  bool get hasLiveRhythm => !finished && seconds < _choruses.last.end;
+
+  int get volumeWarningMask {
+    if (!hasLiveRhythm) return 0;
+    return (_levels[0] == CrowdStatus.ready ? 0 : 1) |
+        (_levels[1] == CrowdStatus.ready ? 0 : 2);
+  }
 
   MixCue cueFor(FestivalZone zone) {
     if (finished || seconds >= _choruses.last.end) return MixCue.none;

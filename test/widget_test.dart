@@ -51,14 +51,14 @@ void main() {
       of: rear,
       matching: find.byWidgetPredicate(
         (widget) =>
-            widget is GestureDetector && widget.onHorizontalDragUpdate != null,
+            widget is GestureDetector && widget.onVerticalDragUpdate != null,
       ),
     );
     final track = tester.getRect(rearTrack);
     final gesture = await tester.startGesture(
-      Offset(track.left + track.width * .39, track.center.dy),
+      Offset(track.center.dx, track.top + track.height * .60),
     );
-    await gesture.moveBy(const Offset(20, 0));
+    await gesture.moveBy(const Offset(0, -20));
     await gesture.moveTo(track.center);
     await tester.pump();
     expect(scene().focusedZone, FestivalZone.back);
@@ -210,8 +210,7 @@ void main() {
         of: find.byType(ZoneVolumeSlider).last,
         matching: find.byWidgetPredicate(
           (widget) =>
-              widget is GestureDetector &&
-              widget.onHorizontalDragUpdate != null,
+              widget is GestureDetector && widget.onVerticalDragUpdate != null,
         ),
       );
       await tester.tapAt(tester.getCenter(backTrack));
@@ -312,11 +311,12 @@ void main() {
       final cards = find.byType(ZoneControlCard);
       final front = tester.getRect(cards.first);
       final back = tester.getRect(cards.last);
-      expect(front.top, back.top);
+      expect(front.right, lessThan(back.left));
       expect(sceneRect.top, greaterThanOrEqualTo(24));
-      expect(sceneRect.bottom, lessThan(front.top));
-      expect(front.bottom, lessThanOrEqualTo(616));
-      expect(back.bottom, lessThanOrEqualTo(616));
+      expect(sceneRect.contains(front.center), isTrue);
+      expect(sceneRect.contains(back.center), isTrue);
+      expect(front.bottom, lessThanOrEqualTo(sceneRect.bottom));
+      expect(back.bottom, lessThanOrEqualTo(sceneRect.bottom));
       expect(Scrollable.of(tester.element(cards.first)).position.pixels, 0);
       return [front, back];
     }
@@ -329,10 +329,11 @@ void main() {
       of: rearSlider,
       matching: find.byWidgetPredicate(
         (widget) =>
-            widget is GestureDetector && widget.onHorizontalDragUpdate != null,
+            widget is GestureDetector && widget.onVerticalDragUpdate != null,
       ),
     );
     expect(tester.getSize(track).height, greaterThanOrEqualTo(48));
+    expect(tester.getSize(track).width, greaterThanOrEqualTo(48));
     await tester.tapAt(tester.getCenter(track));
     await tester.pump();
     expect(find.text('✓  준비'), findsNWidgets(2));
@@ -424,7 +425,7 @@ void main() {
       of: find.byType(ZoneVolumeSlider).last,
       matching: find.byWidgetPredicate(
         (widget) =>
-            widget is GestureDetector && widget.onHorizontalDragUpdate != null,
+            widget is GestureDetector && widget.onVerticalDragUpdate != null,
       ),
     );
     final track = tester.getRect(rearTrack);
@@ -441,7 +442,7 @@ void main() {
     expect(scene().focusedZone, FestivalZone.front);
     expect(find.byType(ZoneVolumeSlider).hitTestable(), findsNWidgets(2));
     await advanceTo(missedTick);
-    await tester.tapAt(Offset(track.left + track.width * .75, track.center.dy));
+    await tester.tapAt(Offset(track.center.dx, track.top + track.height * .30));
     await advanceTo(252);
     expect(find.text('10 콤보!'), findsNothing);
     await advanceTo(800);

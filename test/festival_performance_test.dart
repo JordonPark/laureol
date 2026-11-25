@@ -15,8 +15,10 @@ void main() {
     expect(performance.remainingBeats, 4);
     expect(performance.recommendedSignalZone, front);
     expect(performance.cueFor(back), MixCue.adjust);
+    expect(performance.volumeWarningMask, 2);
     expect(performance.readyVolumeRange(back), (minimum: 46, maximum: 58));
     performance.setVolume(back, 50);
+    expect(performance.volumeWarningMask, 0);
     expect(performance.takeRecentCues(), [FestivalCue.applause]);
     performance.queue(front);
     performance.queue(back);
