@@ -157,8 +157,6 @@ class FestivalScene extends StatefulWidget {
     this.comboEffect,
     this.frontCue = MixCue.none,
     this.backCue = MixCue.none,
-    this.frontControl,
-    this.backControl,
     this.readyPulse = 0,
     this.readyZones = 0,
   });
@@ -179,8 +177,6 @@ class FestivalScene extends StatefulWidget {
   final ({int count, int elapsedTicks})? comboEffect;
   final MixCue frontCue;
   final MixCue backCue;
-  final Widget? frontControl;
-  final Widget? backControl;
   final int readyPulse;
   final int readyZones;
 
@@ -286,8 +282,6 @@ class _FestivalSceneState extends State<FestivalScene> {
                           lightingTier: widget.lightingTier,
                           frontCue: widget.frontCue,
                           backCue: widget.backCue,
-                          showFrontLabel: widget.frontControl == null,
-                          showBackLabel: widget.backControl == null,
                           readyZones: widget.readyZones,
                           pulseProgress: progress,
                         ),
@@ -295,16 +289,6 @@ class _FestivalSceneState extends State<FestivalScene> {
                     ),
                     if (widget.onZoneSelected != null)
                       LayoutBuilder(builder: _audienceTargets),
-                    if (widget.frontControl case final frontControl?)
-                      Align(
-                        alignment: const Alignment(-.94, .5),
-                        child: frontControl,
-                      ),
-                    if (widget.backControl case final backControl?)
-                      Align(
-                        alignment: const Alignment(.94, .65),
-                        child: backControl,
-                      ),
                     if (widget.comboEffect case final celebration?)
                       _ComboCelebration(
                         count: celebration.count,
@@ -468,8 +452,6 @@ class _FestivalPainter extends CustomPainter {
     required this.lightingTier,
     required this.frontCue,
     required this.backCue,
-    required this.showFrontLabel,
-    required this.showBackLabel,
     required this.readyZones,
     required this.pulseProgress,
   }) : images = Map.of(images);
@@ -490,8 +472,6 @@ class _FestivalPainter extends CustomPainter {
   final int lightingTier;
   final MixCue frontCue;
   final MixCue backCue;
-  final bool showFrontLabel;
-  final bool showBackLabel;
   final int readyZones;
   final double pulseProgress;
 
@@ -840,29 +820,25 @@ class _FestivalPainter extends CustomPainter {
     final focusPercent = focusedVolume == null ? '' : ' $focusedVolume%';
     final choose = canSelectAudience ? ' ›' : '';
     _drawReadyPulse(canvas);
-    if (showFrontLabel) {
-      _zoneLabel(
-        canvas,
-        '앞줄 ${_zoneMark(frontCue, front)}${frontFocused ? focusPercent : choose}',
-        _zoneColor(
-          frontCue,
-          frontFocused ? front.color : const Color(0xFF7CE0C2),
-        ),
-        const Offset(15, 189),
-        focused: frontFocused || frontCue != MixCue.none,
-        statusColor: front.color,
-      );
-    }
-    if (showBackLabel) {
-      _zoneLabel(
-        canvas,
-        '뒷줄 ${_zoneMark(backCue, back)}${backFocused ? focusPercent : choose}',
-        _zoneColor(backCue, backFocused ? back.color : const Color(0xFFFFC46A)),
-        const Offset(15, 253),
-        focused: backFocused || backCue != MixCue.none,
-        statusColor: back.color,
-      );
-    }
+    _zoneLabel(
+      canvas,
+      '앞줄 ${_zoneMark(frontCue, front)}${frontFocused ? focusPercent : choose}',
+      _zoneColor(
+        frontCue,
+        frontFocused ? front.color : const Color(0xFF7CE0C2),
+      ),
+      const Offset(15, 189),
+      focused: frontFocused || frontCue != MixCue.none,
+      statusColor: front.color,
+    );
+    _zoneLabel(
+      canvas,
+      '뒷줄 ${_zoneMark(backCue, back)}${backFocused ? focusPercent : choose}',
+      _zoneColor(backCue, backFocused ? back.color : const Color(0xFFFFC46A)),
+      const Offset(15, 253),
+      focused: backFocused || backCue != MixCue.none,
+      statusColor: back.color,
+    );
     canvas.restore();
   }
 
@@ -881,8 +857,6 @@ class _FestivalPainter extends CustomPainter {
       lightingTier != oldDelegate.lightingTier ||
       frontCue != oldDelegate.frontCue ||
       backCue != oldDelegate.backCue ||
-      showFrontLabel != oldDelegate.showFrontLabel ||
-      showBackLabel != oldDelegate.showBackLabel ||
       readyZones != oldDelegate.readyZones ||
       pulseProgress != oldDelegate.pulseProgress ||
       venue != oldDelegate.venue ||

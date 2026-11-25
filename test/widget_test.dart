@@ -325,10 +325,15 @@ void main() {
       final back = tester.getRect(cards.last);
       expect(front.right, lessThan(back.left));
       expect(sceneRect.top, greaterThanOrEqualTo(24));
-      expect(sceneRect.contains(front.center), isTrue);
-      expect(sceneRect.contains(back.center), isTrue);
-      expect(front.bottom, lessThanOrEqualTo(sceneRect.bottom));
-      expect(back.bottom, lessThanOrEqualTo(sceneRect.bottom));
+      expect(sceneRect.bottom, lessThan(front.top));
+      expect(front.top, back.top);
+      final notes = tester.getRect(find.byType(BeatStrip));
+      expect(notes.left, greaterThan(front.right));
+      expect(notes.right, lessThan(back.left));
+      expect(
+        back.bottom,
+        lessThan(tester.getRect(find.byType(SignalButton)).top),
+      );
       expect(Scrollable.of(tester.element(cards.first)).position.pixels, 0);
       return [front, back];
     }
