@@ -1101,7 +1101,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     final backKnob = _volumeControl(FestivalZone.back);
     final mixer = LayoutBuilder(
       builder: (context, bounds) {
-        if (bounds.maxWidth < 272 ||
+        if (bounds.maxWidth < 284 ||
             MediaQuery.textScalerOf(context).scale(14) > 20) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

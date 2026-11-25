@@ -350,7 +350,7 @@ void main() {
       ),
     );
     expect(tester.getSize(track).height, greaterThanOrEqualTo(48));
-    expect(tester.getSize(track).width, greaterThanOrEqualTo(48));
+    expect(tester.getSize(track).width, greaterThanOrEqualTo(76));
     await tester.drag(track, const Offset(0, -30));
     await tester.pump();
     expect(find.text('✓  준비'), findsNWidgets(2));

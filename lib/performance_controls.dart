@@ -324,7 +324,7 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
           ? (_) => widget.onInteractionEnd?.call()
           : null,
       child: SizedBox(
-        width: 60,
+        width: 76,
         height: _height,
         child: CustomPaint(
           painter: _VolumeDialPainter(
@@ -903,7 +903,7 @@ class ZoneControlCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 76,
+      width: 88,
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
       decoration: BoxDecoration(
         color: const Color(0xED24203A),
