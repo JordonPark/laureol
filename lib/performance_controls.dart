@@ -220,7 +220,7 @@ class BeatStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = label ?? '남은 박 $remaining';
     final segments = total > 6 ? 6 : total;
-    final comboText = '$combo 콤보${holdingCombo ? ' 유지' : ''}';
+    final comboText = _comboLabel(combo, holdingCombo);
     return Semantics(
       label: combo == 0 ? text : '$text, $comboText',
       excludeSemantics: true,
@@ -236,14 +236,7 @@ class BeatStrip extends StatelessWidget {
               runSpacing: 2,
               children: [
                 Text(text, style: const TextStyle(color: _ink)),
-                if (combo > 0)
-                  Text(
-                    comboText,
-                    style: const TextStyle(
-                      color: _mint,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                _ComboBadge(count: combo, holding: holdingCombo),
               ],
             ),
           ),
@@ -268,6 +261,119 @@ class BeatStrip extends StatelessWidget {
       ),
     );
   }
+}
+
+String _comboLabel(int count, bool holding) =>
+    '$count 콤보${holding ? ' 유지' : ''}';
+
+class _ComboBadge extends StatefulWidget {
+  const _ComboBadge({required this.count, required this.holding});
+
+  final int count;
+  final bool holding;
+
+  @override
+  State<_ComboBadge> createState() => _ComboBadgeState();
+}
+
+class _ComboBadgeState extends State<_ComboBadge>
+    with SingleTickerProviderStateMixin {
+  static final _punch = TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 0, end: 1), weight: 25),
+    TweenSequenceItem(tween: Tween(begin: 1, end: 0), weight: 75),
+  ]);
+
+  late final AnimationController _pulse;
+  bool _continued = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 360),
+      value: 1,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _ComboBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.holding ||
+        widget.count == 0 ||
+        MediaQuery.disableAnimationsOf(context)) {
+      _pulse.value = 1;
+    } else if (widget.count > oldWidget.count) {
+      _continued = oldWidget.holding;
+      _pulse.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.count == 0) return const SizedBox.shrink();
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return AnimatedBuilder(
+      animation: _pulse,
+      child: Text(
+        _comboLabel(widget.count, widget.holding),
+        style: TextStyle(
+          color: widget.holding ? _muted : _mint,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      builder: (context, child) {
+        final progress = reduceMotion ? 1.0 : _pulse.value;
+        final amplitude = _continued ? .23 : .12;
+        return CustomPaint(
+          foregroundPainter: _ComboPixels(progress, _continued),
+          child: Transform.scale(
+            scale: 1 + amplitude * _punch.transform(progress),
+            transformHitTests: false,
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ComboPixels extends CustomPainter {
+  const _ComboPixels(this.progress, this.continued);
+
+  final double progress;
+  final bool continued;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress >= 1) return;
+    final paint = Paint()
+      ..isAntiAlias = false
+      ..color = (continued ? _amber : _mint).withAlpha(
+        ((1 - progress) * 220).round(),
+      );
+    final spread = (progress * (continued ? 16 : 8)).roundToDouble();
+    void pixel(double x, double y, double side) {
+      canvas.drawRect(Rect.fromLTWH(x, y, side, side), paint);
+    }
+
+    pixel(4 - spread, 9 - spread / 2, 3);
+    pixel(size.width - 8 + spread / 3, 13 + spread / 3, 3);
+    if (continued) {
+      pixel(size.width / 2 + spread, 5 - spread / 2, 4);
+      pixel(size.width / 2 - spread, size.height - 4 + spread / 3, 3);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ComboPixels oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.continued != continued;
 }
 
 class EventNotice extends StatelessWidget {

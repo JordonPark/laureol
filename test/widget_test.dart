@@ -21,6 +21,49 @@ void main() {
     expect(find.text('라우럴! 볼륨 좀 올려'), findsOneWidget);
   });
 
+  testWidgets('Combo reconnect animates in place and respects reduced motion', (
+    tester,
+  ) async {
+    Widget strip(int combo, {bool holding = false, bool reduceMotion = false}) {
+      return MediaQuery(
+        data: MediaQueryData(disableAnimations: reduceMotion),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: SizedBox(
+              width: 300,
+              child: BeatStrip(
+                remaining: 4,
+                combo: combo,
+                holdingCombo: holding,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    double scale() =>
+        tester.widget<Transform>(find.byType(Transform)).transform[0];
+    await tester.pumpWidget(strip(18, holding: true));
+    final originalBounds = tester.getRect(find.byType(BeatStrip));
+    expect(find.text('18 콤보 유지'), findsOneWidget);
+    expect(scale(), 1);
+
+    await tester.pumpWidget(strip(19));
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(find.text('19 콤보'), findsOneWidget);
+    expect(scale(), greaterThan(1.2));
+    expect(tester.getRect(find.byType(BeatStrip)), originalBounds);
+    await tester.pumpAndSettle();
+    expect(scale(), 1);
+
+    await tester.pumpWidget(strip(20, reduceMotion: true));
+    await tester.pump(const Duration(milliseconds: 90));
+    expect(find.text('20 콤보'), findsOneWidget);
+    expect(scale(), 1);
+  });
+
   for (final (name, size, padding) in [
     (
       'short portrait',
