@@ -10,23 +10,27 @@ class VenueCard extends StatelessWidget {
     required this.venue,
     required this.artHeight,
     required this.best,
+    required this.missionCompleted,
     required this.onPlay,
   });
 
   final FestivalVenue venue;
   final double artHeight;
   final int? best;
+  final bool missionCompleted;
   final VoidCallback? onPlay;
 
   @override
   Widget build(BuildContext context) {
     final locked = onPlay == null;
-    final neighborhood = venue == FestivalVenue.neighborhood;
-    final accent = neighborhood
-        ? const Color(0xFFFFC46A)
-        : const Color(0xFF7CE0C2);
+    final accent = switch (venue) {
+      FestivalVenue.neighborhood => const Color(0xFFFFC46A),
+      FestivalVenue.nightMarket => const Color(0xFF7CE0C2),
+      FestivalVenue.liveClub => const Color(0xFFF1A6F3),
+      FestivalVenue.rooftop => const Color(0xFF8FCDFF),
+    };
     final objective = Text(
-      locked ? '동네 축제에서 두 줄 8박 연속 떼창으로 해금' : venue.mission,
+      locked ? venue.unlockHint ?? venue.mission : venue.mission,
       style: TextStyle(
         color: locked ? const Color(0xFFBDB8CD) : accent,
         fontSize: 13,
@@ -108,6 +112,12 @@ class VenueCard extends StatelessWidget {
                           color: Color(0xFFE3D8F0),
                           label: '잠김',
                           icon: CupertinoIcons.lock_fill,
+                        ),
+                      if (missionCompleted)
+                        _VenueTag(
+                          color: accent,
+                          label: '목표 달성',
+                          icon: CupertinoIcons.checkmark,
                         ),
                     ],
                   ),

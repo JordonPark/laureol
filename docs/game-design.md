@@ -868,3 +868,41 @@
 > Original Korean indie game venue card art, landscape 3:2. True 2.5D 16-bit pixel art with deliberate hard square pixels, crisp silhouettes, rich pixel clusters, no smooth photographic textures. A wide clear concert composition, stage and crowd readable at phone thumbnail size. Colorful but controlled contrast, high polish. Only the environment illustration, no text, UI, frame, border, graphics labels, watermarks or lettering. A busy Korean outdoor night market turned into a small live gig after dark, viewed from an elevated diagonal angle. Teal carts, coral lanterns, a small improvised performance stage with warm stage lighting, a food truck and compact portable generator visible near the rear crowd. Night navy, jade and coral make it distinct from an amber neighborhood festival. Keep the crowd and the scene readable, with dark-safe lower corners and dramatic warm-versus-cool lighting.
 
 </details>
+
+## 41. 네 공연의 오프라인 진행
+
+공연은 동네 축제 → 야외 야시장 → 지하 라이브클럽 → 옥상 공연 순으로 열려요. 동네 축제에서 두 줄 동시 떼창 8박을 달성하면 야시장이 열려요. 야시장을 완주하면 라이브클럽이, 라이브클럽을 완주하면 옥상이 열려요. 기존 기기에 저장된 완주 기록도 해금에 사용해요. 다음 무대가 열려 있으면 전체 결과에서 바로 이어갈 수 있어요.
+
+| 공연 | 오프라인 반주 | 공연 중 조절 | 재도전 목표 |
+|---|---|---|---|
+| 동네 축제 | [동네 축제 공연곡](../assets/audio/festival-first-show.wav) | 앞줄 관객 접근과 뒷줄 발전기 | 두 줄이 8박 연속 떼창 |
+| 야외 야시장 | [야시장 스텝](../assets/audio/night-market-step.wav) | 첫 후렴은 시장 소음, 마지막은 늦게 멈추는 발전기 | 발전기 정지 뒤 4박 안에 두 줄 합류 |
+| 지하 라이브클럽 | [네온 브레이크](../assets/audio/neon-break.wav) | 첫 후렴은 앞줄 모니터 증폭, 두 번째는 뒷벽 저음 반사, 마지막은 앞줄과 뒷줄 스피커 감쇠 | 마지막 후렴에서 두 줄이 함께 12박 떼창 |
+| 옥상 공연 | [바람 위 앙코르](../assets/audio/rooftop-encore.wav) | 뒷줄과 앞줄에 차례로 맞바람, 마지막 후렴에서 방향이 바뀌는 돌풍 | 세 후렴 모두에서 두 줄 함께 떼창 |
+
+각 공연은 후렴 3개와 90점 만점을 사용해요. 그래서 총 12개 후렴을 각 공연 결과에서 골라 연습할 수 있어요. 최고 점수와 목표 달성 여부는 무대별로 기기에 저장해요. 무대 선택의 목표 달성 표시는 이후 공연 점수가 낮아도 유지돼요.
+
+두 새 무대에서 사건이 시작되거나 끝나기 2초 전부터 안내해요. 사건이 발생한 구역의 민트색 눈금만 이동하고, 영향을 받는 객석에 도트 효과가 표시돼요. 새 반주도 120 BPM이며 득점 구간은 원곡과 같은 24초·52초·80초부터 시작해요. WAV는 앱에 포함하고, 후렴 연습과 콤보 복구에서도 해당 무대의 반주를 사용해요.
+
+공연 선택에는 [라이브클럽 원화](art/festival/venue-club.png)와 [옥상 원화](art/festival/venue-rooftop.png)를 사용해요. 실제 공연에는 [라이브클럽 무대](art/festival/stage-club.png)와 [옥상 무대](art/festival/stage-rooftop.png)를 사용해요.
+
+<details>
+<summary>내장 imagegen 원화와 무대 프롬프트</summary>
+
+**지하 라이브클럽 공연 선택**
+
+> Use case: stylized-concept. Asset type: landscape mobile game venue selection illustration, 3:2 composition. An original small Korean underground live club during a chiptune show, high diagonal 2.5D three-quarter view. A tiny singer with microphone and synth guitarist on a low indoor stage with black monitor cabinets and plum velvet acoustic panels. A close standing crowd in silhouette with a few violet edge lights, compact stacked speakers, an industrial low ceiling, deep charcoal violet with ice-blue, orchid and electric pink stage lights. Wide high view that reads at mobile size, with the middle 65% of the image vertically carrying the important action for a wider crop. Crisp authentic early 16-bit isometric pixel art, deliberately visible square pixel clusters, clean stepped edges, sharp silhouettes, limited palette, no smooth painted texture. Distinct intimate underground venue. No text, logo, typography, UI, watermark or borders.
+
+**옥상 공연 선택**
+
+> Use case: stylized-concept. Asset type: landscape mobile game venue selection illustration, 3:2 composition. An original Korean rooftop encore concert at blue hour, high diagonal 2.5D three-quarter view. Show a small low stage with a tiny singer and electric guitarist and a close dancing crowd, amber string bulbs and turquoise lighting reflecting on roof tiles. A parapet and a distant skyline of Korean mid-rise apartment blocks with hundreds of small luminous windows, wind-pulled pennants, lilac moon sky. Palette of midnight teal, cobalt, apricot and a few dusty lavender accents, vivid intimate small gig. Wide high view reads at mobile size, keep the main stage and crowd within the middle 65% vertically for a wider crop. Crisp early 16-bit isometric pixel art, deliberately visible square pixel clusters, limited palette and crisp stepped edges. No text, logo, typography, UI, watermark or borders.
+
+**지하 라이브클럽 무대**
+
+> Use case: stylized-concept. Asset type: isolated in-game environment sprite, true transparent PNG. A single 2.5D pixel art small Korean underground music club stage, straight-on slightly elevated camera with a little of the RIGHT side visible, wide stage deck, vibrant violet and dark plum velvet curtain and dark gray acoustic panels BEHIND the deck, a low top metal lighting bar with pink and ice-blue lights, 3 small stairs at its front left, square dark side pillars. Simple broad rectangular STAGE ONLY with an empty uncluttered performance deck for separate actors. Three quarter view with the front stage edge nearly horizontal. Deck floor must be clearly visible, warm dark lavender. Composition exactly one whole connected cutout, generous 3-5 percent margin, all corners included. Bold visible square pixel clusters, chunky authentic 16-bit pixel art, crisp stepped silhouettes, limited palette, no gradients, no painterly shading. Do not include any people, microphones, guitars, audience, freestanding speakers, background room, floor around the stage, text, or watermark. Transparent background outside the single prop; landscape 4:3.
+
+**옥상 실제 무대**
+
+> Use case: stylized-concept. Asset type: isolated in-game environment sprite, true transparent PNG. A single 2.5D pixel-art rooftop music deck as a standalone prop. Straight-on slightly elevated camera with a little of the RIGHT side visible and the front edge nearly horizontal. Wide low amber wooden stage platform with its two shallow front stairs, teal support trim, a mid-height navy blue metal roof railing behind it, two thin rear posts stringing a row of glowing peach bulbs between them, two planters tucked into the rear corners. Open top, open air, no canopy, no ceiling. Keep the broad stage floor empty and uncluttered so two separate sprite performers can later stand on it. All corners included, generous 3-5 percent margin. One whole connected cutout only, clear bold square 16-bit pixel clusters, crisp stepped edges, limited Teal and Amber palette, no gradients or painterly shading. Do not include people, an audience, signs, music instruments, microphones, equipment, a building, a skyline, an outside floor, text, or watermark. Transparent background outside the single prop; landscape 4:3.
+
+</details>

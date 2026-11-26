@@ -32,8 +32,23 @@ class FestivalRecords {
   ({int score, ChorusCheckpoint checkpoint})? get concertBest =>
       bestFor(FestivalVenue.neighborhood);
 
-  String _recordKey(FestivalVenue venue) =>
-      venue == FestivalVenue.neighborhood ? _concert : _marketConcert;
+  bool isUnlocked(FestivalVenue venue) => switch (venue) {
+    FestivalVenue.neighborhood => true,
+    FestivalVenue.nightMarket => nightMarketUnlocked,
+    FestivalVenue.liveClub => bestFor(FestivalVenue.nightMarket) != null,
+    FestivalVenue.rooftop => bestFor(FestivalVenue.liveClub) != null,
+  };
+
+  String _recordKey(FestivalVenue venue) => switch (venue) {
+    FestivalVenue.neighborhood => _concert,
+    FestivalVenue.nightMarket => _marketConcert,
+    FestivalVenue.liveClub => 'festival.liveClubConcert.v1',
+    FestivalVenue.rooftop => 'festival.rooftopConcert.v1',
+  };
+
+  bool missionCompleted(FestivalVenue venue) =>
+      (venue == FestivalVenue.neighborhood && nightMarketUnlocked) ||
+      (_preferences.getBool('${_recordKey(venue)}.mission') ?? false);
 
   ({int score, ChorusCheckpoint checkpoint})? bestFor(FestivalVenue venue) {
     final stored = _preferences.getString(_recordKey(venue));
@@ -68,6 +83,10 @@ class FestivalRecords {
           performance.missionAchieved &&
           !nightMarketUnlocked)
         _preferences.setBool(_marketUnlocked, true),
+      if (performance.venue != FestivalVenue.neighborhood &&
+          performance.missionAchieved &&
+          !missionCompleted(performance.venue))
+        _preferences.setBool('${_recordKey(performance.venue)}.mission', true),
       if (best == null || score > best.score)
         _preferences.setString(
           _recordKey(performance.venue),

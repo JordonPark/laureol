@@ -347,6 +347,35 @@ void main() {
     expect(replay.status(FestivalZone.back), CrowdStatus.loud);
   });
 
+  test(
+    'Club and rooftop switch individual targets through different events',
+    () {
+      final club = FestivalPerformance(venue: FestivalVenue.liveClub);
+      final rooftop = FestivalPerformance(venue: FestivalVenue.rooftop);
+      const front = FestivalZone.front;
+      const back = FestivalZone.back;
+
+      _at(club, 20);
+      _at(rooftop, 20);
+      expect(club.eventNotice, ('앞줄 모니터 증폭', 2));
+      expect(rooftop.eventNotice, ('뒷줄에 맞바람', 2));
+      _at(club, 22);
+      _at(rooftop, 22);
+      expect(club.readyVolumeRange(front), (minimum: 30, maximum: 42));
+      expect(club.readyVolumeRange(back), (minimum: 46, maximum: 58));
+      expect(rooftop.readyVolumeRange(front), (minimum: 46, maximum: 58));
+      expect(rooftop.readyVolumeRange(back), (minimum: 60, maximum: 72));
+
+      _at(club, 85);
+      _at(rooftop, 85);
+      expect(club.activeMixZone, back);
+      expect(rooftop.activeMixZone, front);
+      expect(club.generatorRunning, isFalse);
+      expect(rooftop.generatorRunning, isFalse);
+      expect(club.takeRecentCues(), isNot(contains(FestivalCue.generatorStop)));
+    },
+  );
+
   test('Replay uses the original audio offset and drops expired cues', () {
     final performance = FestivalPerformance();
     _at(performance, 92);

@@ -27,6 +27,49 @@ void main() {
     expect(find.bySemanticsLabel('라우럴! 볼륨 좀 올려'), findsOneWidget);
   });
 
+  testWidgets(
+    'An existing market record leads through the club to the rooftop',
+    (tester) async {
+      final festival = FestivalPerformance()
+        ..startMainConcert()
+        ..setVolume(FestivalZone.back, 50)
+        ..advanceTicks(600);
+      final market = FestivalPerformance(venue: FestivalVenue.nightMarket)
+        ..advanceTicks(736);
+      expect(await records.record(festival), isTrue);
+      expect(await records.record(market), isTrue);
+
+      await tester.binding.setSurfaceSize(const Size(390, 740));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(LaureolApp(records: records));
+      await tester.tap(find.text('공연 시작'));
+      await tester.pumpAndSettle();
+      expect(find.text('옥상 공연 시작'), findsNothing);
+      final club = find.text('지하 라이브클럽 시작');
+      await tester.ensureVisible(club);
+      await tester.pumpAndSettle();
+      await tester.tap(club);
+      await tester.pumpAndSettle();
+
+      FestivalScene scene() => tester.widget(find.byType(FestivalScene));
+      expect(scene().venue, FestivalVenue.liveClub);
+      final rear = _dialGesture(find.byType(ZoneVolumeSlider).last);
+      await tester.drag(rear, const Offset(0, -30));
+      await tester.pump();
+      await tester.tap(find.text('시작'));
+      await tester.pump();
+      await tester.pump(festivalTick * (736 - scene().tick));
+      await tester.pumpAndSettle();
+
+      final nextShow = find.text('다음 무대 · 옥상 공연');
+      await tester.ensureVisible(nextShow);
+      await tester.tap(nextShow);
+      await tester.pumpAndSettle();
+      expect(scene().venue, FestivalVenue.rooftop);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('First rehearsal waits for the highlighted slider and signal', (
     tester,
   ) async {
@@ -485,7 +528,7 @@ void main() {
     await tapLabel('공연 시작');
     expect(find.text('공연 선택'), findsOneWidget);
     expect(find.text('야외 야시장'), findsOneWidget);
-    expect(find.text('잠김'), findsOneWidget);
+    expect(find.text('잠김'), findsNWidgets(3));
     expect(find.text('야외 야시장 시작'), findsNothing);
     await tapLabel('동네 축제 시작');
     FestivalScene scene() =>

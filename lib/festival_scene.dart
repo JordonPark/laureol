@@ -15,6 +15,18 @@ double _sceneY(double y, bool compact) {
 enum _Sprite {
   ground('festival/ground', 1774, 887, Rect.fromLTRB(30, 179, 1741, 707)),
   stage('festival/stage', 1536, 1024, Rect.fromLTRB(122, 21, 1408, 987)),
+  clubStage(
+    'festival/stage-club',
+    1448,
+    1086,
+    Rect.fromLTRB(30, 138, 1413, 988),
+  ),
+  rooftopStage(
+    'festival/stage-rooftop',
+    1448,
+    1086,
+    Rect.fromLTRB(18, 160, 1415, 972),
+  ),
   backdrop('festival/backdrop', 1774, 887, Rect.fromLTRB(241, 39, 1532, 879)),
   speaker('festival/speaker', 1774, 887, Rect.fromLTRB(619, 11, 1148, 876)),
   lighting('festival/lighting', 1774, 887, Rect.fromLTRB(625, 18, 1128, 882)),
@@ -162,6 +174,7 @@ class FestivalScene extends StatefulWidget {
     this.readyPulse = 0,
     this.readyZones = 0,
     this.signalPulse,
+    this.activeMixZone,
   });
 
   final int tick;
@@ -185,6 +198,7 @@ class FestivalScene extends StatefulWidget {
   final int readyPulse;
   final int readyZones;
   final ({int serial, int rows})? signalPulse;
+  final FestivalZone? activeMixZone;
 
   @override
   State<FestivalScene> createState() => _FestivalSceneState();
@@ -245,10 +259,12 @@ class _FestivalSceneState extends State<FestivalScene> {
 
   @override
   Widget build(BuildContext context) {
+    final generator = widget.venue.usesGenerator
+        ? ' 발전기 ${widget.generatorRunning ? '작동 중' : '정지'}.'
+        : '';
     final description =
         '${widget.venue.title}. 앞줄 ${widget.front.label}, '
-        '뒷줄 ${widget.back.label}. '
-        '발전기 ${widget.generatorRunning ? '작동 중' : '정지'}.';
+        '뒷줄 ${widget.back.label}.$generator';
     return Semantics(
       label: description,
       image: true,
@@ -290,6 +306,10 @@ class _FestivalSceneState extends State<FestivalScene> {
                           backCue: widget.backCue,
                           readyZones: widget.readyZones,
                           pulseProgress: progress,
+                          activeMixZone: widget.activeMixZone,
+                          reducedMotion: MediaQuery.disableAnimationsOf(
+                            context,
+                          ),
                         ),
                       ),
                     ),
@@ -570,6 +590,8 @@ class _FestivalPainter extends CustomPainter {
     required this.backCue,
     required this.readyZones,
     required this.pulseProgress,
+    required this.activeMixZone,
+    required this.reducedMotion,
   }) : images = Map.of(images);
 
   final Map<_Sprite, ui.Image> images;
@@ -590,6 +612,8 @@ class _FestivalPainter extends CustomPainter {
   final MixCue backCue;
   final int readyZones;
   final double pulseProgress;
+  final FestivalZone? activeMixZone;
+  final bool reducedMotion;
 
   final _nearest = Paint()..filterQuality = FilterQuality.none;
 
@@ -602,6 +626,7 @@ class _FestivalPainter extends CustomPainter {
     double height, {
     int frame = 0,
     bool mirror = false,
+    Color? tint,
   }) {
     final image = images[sprite];
     if (image == null) return;
@@ -619,11 +644,16 @@ class _FestivalPainter extends CustomPainter {
     canvas.save();
     canvas.translate(base.dx, _y(base.dy));
     if (mirror) canvas.scale(-1, 1);
+    final paint = tint == null
+        ? _nearest
+        : (Paint()
+            ..filterQuality = FilterQuality.none
+            ..colorFilter = ColorFilter.mode(tint, BlendMode.modulate));
     canvas.drawImageRect(
       image,
       source,
       Rect.fromLTWH(-width / 2, -size, width, size),
-      _nearest,
+      paint,
     );
     canvas.restore();
   }
@@ -795,31 +825,128 @@ class _FestivalPainter extends CustomPainter {
   }
 
   void _drawStageLights(Canvas canvas) {
-    if (lightingTier == 0 && venue != FestivalVenue.nightMarket) return;
-    const colors = [Color(0xFF7CE0C2), Color(0xFFFFC46A), Color(0xFFFF9EDA)];
-    for (
-      var i = 0;
-      i < lightingTier + (venue == FestivalVenue.nightMarket ? 1 : 0);
-      i++
-    ) {
-      final x = 78.0 + i * 55;
+    final colors = switch (venue) {
+      FestivalVenue.liveClub => const [
+        Color(0xFFFF69D4),
+        Color(0xFF8CCCFF),
+        Color(0xFFDAB2FF),
+      ],
+      FestivalVenue.rooftop => const [
+        Color(0xFFFFBF7F),
+        Color(0xFF71DCEE),
+        Color(0xFFC1B6FF),
+      ],
+      _ => const [Color(0xFF7CE0C2), Color(0xFFFFC46A), Color(0xFFFF9EDA)],
+    };
+    final count =
+        lightingTier +
+        (venue == FestivalVenue.nightMarket || venue == FestivalVenue.liveClub
+            ? 1
+            : 0);
+    for (var i = 0; i < count; i++) {
+      final x = switch (venue) {
+        FestivalVenue.liveClub => 123.0 + i * 27,
+        FestivalVenue.rooftop => 112.0 + i * 34,
+        _ => 78.0 + i * 55,
+      };
+      final top = _y(switch (venue) {
+        FestivalVenue.liveClub => 61,
+        FestivalVenue.rooftop => 66,
+        _ => 89,
+      });
       final color = colors[i % colors.length];
       final beam = Path()
-        ..moveTo(x, _y(89))
+        ..moveTo(x, top)
         ..lineTo(x - 52, _y(177))
         ..lineTo(x + 64, _y(177))
         ..close();
       canvas.drawPath(
         beam,
         Paint()
-          ..shader = ui.Gradient.linear(Offset(x, _y(89)), Offset(x, _y(177)), [
+          ..shader = ui.Gradient.linear(Offset(x, top), Offset(x, _y(177)), [
             color.withAlpha(158),
             color.withAlpha(35),
           ]),
       );
+      if (venue.usesGenerator) {
+        canvas.drawRect(
+          Rect.fromLTWH(x - 3, top + 1, 6, 5),
+          Paint()..color = color,
+        );
+      }
+    }
+  }
+
+  void _drawClubWalls(Canvas canvas) {
+    final paint = Paint();
+    for (final x in [6.0, 286.0]) {
+      paint.color = const Color(0xFF1C142C);
+      canvas.drawRect(Rect.fromLTRB(x, _y(19), x + 67, _y(156)), paint);
+      paint.color = const Color(0xFF3B294A);
+      canvas.drawRect(Rect.fromLTRB(x + 3, _y(23), x + 63, _y(146)), paint);
+      for (var slat = 0; slat < 9; slat++) {
+        paint.color = slat.isEven
+            ? const Color(0xFF30213E)
+            : const Color(0xFF21192F);
+        canvas.drawRect(
+          Rect.fromLTRB(x + 6 + 6 * slat, _y(28), x + 10 + 6 * slat, _y(139)),
+          paint,
+        );
+      }
+      paint.color = const Color(0xFFA4619D);
+      canvas.drawRect(Rect.fromLTWH(x + 9, _y(44), 3, 28), paint);
+      paint.color = const Color(0xFF575387);
+      canvas.drawRect(Rect.fromLTWH(x + 50, _y(44), 3, 28), paint);
+    }
+  }
+
+  void _drawSkyline(Canvas canvas) {
+    final paint = Paint()..color = const Color(0xFFFBC9D9);
+    canvas.drawCircle(Offset(295, _y(34)), 13, paint);
+    for (var i = 0; i < 15; i++) {
+      final x = 25.0 * i;
+      final top = _y(77 + (i * 19 % 38).toDouble());
+      paint.color = i.isEven
+          ? const Color(0xFF222D52)
+          : const Color(0xFF1C2645);
+      canvas.drawRect(Rect.fromLTRB(x, top, x + 22, _y(154)), paint);
+      for (var light = 0; light < 7; light++) {
+        if ((i * 3 + light) % 4 == 0) continue;
+        paint.color = light.isEven
+            ? const Color(0xFFB18980)
+            : const Color(0xFF7293AF);
+        canvas.drawRect(
+          Rect.fromLTWH(
+            x + 4 + 8 * (light % 2),
+            top + 5 + (light ~/ 2) * 7,
+            3,
+            2,
+          ),
+          paint,
+        );
+      }
+    }
+  }
+
+  void _drawVenueEvent(Canvas canvas) {
+    final zone = activeMixZone;
+    if (zone == null) return;
+    final frontRow = zone == FestivalZone.front;
+    final y = _y(frontRow ? 182 : 250);
+    final rooftop = venue == FestivalVenue.rooftop;
+    final paint = Paint()
+      ..color = rooftop ? const Color(0x998FE5FF) : const Color(0xAAE9A0FF);
+    final phase = reducedMotion ? 0 : tick % 10;
+    for (var i = 0; i < 4; i++) {
+      final shift = (frontRow ? phase : -phase).toDouble();
+      final x = 79 + i * 56.0 + shift;
       canvas.drawRect(
-        Rect.fromLTWH(x - 3, _y(90), 6, 5),
-        Paint()..color = color,
+        Rect.fromLTWH(x, y + 5 * (i % 2), rooftop ? 16 : 4, 2),
+        paint,
+      );
+      canvas.drawRect(
+        Rect.fromLTWH(x + 5, y + 2 + 5 * (i % 2), rooftop ? 8 : 4, 2),
+        paint,
       );
     }
   }
@@ -830,18 +957,38 @@ class _FestivalPainter extends CustomPainter {
     final height = compact ? 265.0 : 324.0;
     canvas.scale(size.width / 360, size.height / height);
     final scene = Rect.fromLTWH(0, 0, 360, height);
+    final colors = switch (venue) {
+      FestivalVenue.neighborhood => const [
+        Color(0xFF3D2F53),
+        Color(0xFF211E34),
+      ],
+      FestivalVenue.nightMarket => const [Color(0xFF1C3E54), Color(0xFF182633)],
+      FestivalVenue.liveClub => const [Color(0xFF281831), Color(0xFF21172D)],
+      FestivalVenue.rooftop => const [Color(0xFF514484), Color(0xFF19374D)],
+    };
+    final outdoorFestival = venue.usesGenerator;
     canvas.drawRect(
       scene,
       Paint()
         ..shader = ui.Gradient.linear(
           const Offset(0, 0),
           Offset(0, height),
-          venue == FestivalVenue.nightMarket
-              ? const [Color(0xFF1C3E54), Color(0xFF182633)]
-              : const [Color(0xFF3D2F53), Color(0xFF211E34)],
+          colors,
         ),
     );
-    _draw(canvas, _Sprite.ground, const Offset(176, 327), 149);
+    if (venue == FestivalVenue.rooftop) _drawSkyline(canvas);
+    if (venue == FestivalVenue.liveClub) _drawClubWalls(canvas);
+    _draw(
+      canvas,
+      _Sprite.ground,
+      const Offset(176, 327),
+      149,
+      tint: switch (venue) {
+        FestivalVenue.liveClub => const Color(0xFFC2A6DA),
+        FestivalVenue.rooftop => const Color(0xFFAFCAE3),
+        _ => null,
+      },
+    );
     final frontFocused = focusedZone == FestivalZone.front;
     final backFocused = focusedZone == FestivalZone.back;
     if (frontFocused || frontCue != MixCue.none) {
@@ -850,10 +997,17 @@ class _FestivalPainter extends CustomPainter {
     if (backFocused || backCue != MixCue.none) {
       _highlightAudience(canvas, false, _zoneColor(backCue, back.color));
     }
-    _draw(canvas, _Sprite.backdrop, const Offset(70, 123), 65);
-    _draw(canvas, _Sprite.backdrop, const Offset(292, 123), 58, mirror: true);
-    _draw(canvas, _Sprite.lighting, const Offset(39, 154), 103);
-    _draw(canvas, _Sprite.stage, const Offset(167, 178), 170);
+    if (outdoorFestival) {
+      _draw(canvas, _Sprite.backdrop, const Offset(70, 123), 65);
+      _draw(canvas, _Sprite.backdrop, const Offset(292, 123), 58, mirror: true);
+      _draw(canvas, _Sprite.lighting, const Offset(39, 154), 103);
+      _draw(canvas, _Sprite.stage, const Offset(167, 178), 170);
+    } else {
+      final sprite = venue == FestivalVenue.liveClub
+          ? _Sprite.clubStage
+          : _Sprite.rooftopStage;
+      _draw(canvas, sprite, const Offset(172, 178), 137);
+    }
     _drawStageLights(canvas);
     _draw(canvas, _Sprite.speaker, const Offset(61, 170), 61);
     _draw(canvas, _Sprite.speaker, const Offset(267, 166), 55, mirror: true);
@@ -871,7 +1025,9 @@ class _FestivalPainter extends CustomPainter {
       60,
       frame: tick % 4,
     );
-    _draw(canvas, _Sprite.truck, const Offset(295, 242), 88);
+    if (outdoorFestival) {
+      _draw(canvas, _Sprite.truck, const Offset(295, 242), 88);
+    }
 
     final wave = waveFrame;
     if (wave != null) {
@@ -899,16 +1055,18 @@ class _FestivalPainter extends CustomPainter {
       frontRow: true,
       zoneColor: const Color(0xFF7CE0C2),
     );
-    _draw(
-      canvas,
-      _Sprite.vendor,
-      const Offset(292, 262),
-      64,
-      frame: front == CrowdStatus.singing && back == CrowdStatus.singing
-          ? tick % 4
-          : 0,
-    );
-    _draw(canvas, _Sprite.generator, const Offset(310, 298), 46);
+    if (outdoorFestival) {
+      _draw(
+        canvas,
+        _Sprite.vendor,
+        const Offset(292, 262),
+        64,
+        frame: front == CrowdStatus.singing && back == CrowdStatus.singing
+            ? tick % 4
+            : 0,
+      );
+      _draw(canvas, _Sprite.generator, const Offset(310, 298), 46);
+    }
     if (generatorRunning) {
       _draw(
         canvas,
@@ -934,6 +1092,7 @@ class _FestivalPainter extends CustomPainter {
       zoneColor: const Color(0xFFFFC46A),
     );
     final focusPercent = focusedVolume == null ? '' : ' $focusedVolume%';
+    _drawVenueEvent(canvas);
     final choose = canSelectAudience ? ' ›' : '';
     _drawReadyPulse(canvas);
     _zoneLabel(
@@ -975,6 +1134,8 @@ class _FestivalPainter extends CustomPainter {
       backCue != oldDelegate.backCue ||
       readyZones != oldDelegate.readyZones ||
       pulseProgress != oldDelegate.pulseProgress ||
+      activeMixZone != oldDelegate.activeMixZone ||
+      reducedMotion != oldDelegate.reducedMotion ||
       venue != oldDelegate.venue ||
       compact != oldDelegate.compact ||
       images.length != oldDelegate.images.length;

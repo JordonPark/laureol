@@ -398,38 +398,39 @@ class _SelectionScreenState extends State<_SelectionScreen> {
     final compact = size.height < 480;
     final best = widget.records.concertBest;
     final masteryBest = widget.records.masteryBest;
-    final neighborhood = VenueCard(
-      venue: FestivalVenue.neighborhood,
-      artHeight: compact ? 144 : 190,
-      best: best?.score,
-      onPlay: () => _play(),
-    );
-    final market = VenueCard(
-      venue: FestivalVenue.nightMarket,
-      artHeight: compact ? 144 : 158,
-      best: widget.records.bestFor(FestivalVenue.nightMarket)?.score,
-      onPlay: widget.records.nightMarketUnlocked
-          ? () => _play(venue: FestivalVenue.nightMarket)
-          : null,
-    );
+    final cards = [
+      for (final venue in FestivalVenue.values)
+        VenueCard(
+          venue: venue,
+          artHeight: compact ? 144 : 158,
+          best: widget.records.bestFor(venue)?.score,
+          missionCompleted: widget.records.missionCompleted(venue),
+          onPlay: widget.records.isUnlocked(venue)
+              ? () => _play(venue: venue)
+              : null,
+        ),
+    ];
     return _Screen(
       title: '공연 선택',
       compact: compact,
       maxWidth: sideBySide ? 900 : 520,
       children: [
         if (sideBySide)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: neighborhood),
-              const SizedBox(width: 12),
-              Expanded(child: market),
-            ],
-          )
-        else ...[
-          neighborhood,
-          market,
-        ],
+          for (var index = 0; index < cards.length; index += 2)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: cards[index]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: index + 1 < cards.length
+                      ? cards[index + 1]
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            )
+        else
+          ...cards,
         Wrap(
           spacing: 8,
           runSpacing: 6,
@@ -713,7 +714,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
     super.initState();
     _performance = _newPerformance();
     if (widget.records.volume > 0) {
-      _audio = FestivalAudio(widget.records.volume / 100);
+      _audio = FestivalAudio(widget.records.volume / 100, widget.venue);
     }
     WidgetsBinding.instance.addObserver(this);
     _resumeScene();
@@ -960,6 +961,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       readyPulse: _readyPulse,
       readyZones: _readyZones,
       signalPulse: _signalPulse,
+      activeMixZone: performance.activeMixZone,
     );
   }
 
@@ -1083,10 +1085,11 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         (sideBySide ||
             safeWidth <= 380 ||
             bodyHeight < fullSceneHeight + mixerHeight + 225);
+    final venueName = widget.venue.title;
     final title = widget.recovery != null
         ? '콤보 복구 연습'
         : chorus == null
-        ? '${widget.venue.title} 공연'
+        ? (venueName.endsWith('공연') ? venueName : '$venueName 공연')
         : widget.mastery
         ? '숙련 후렴 도전'
         : '후렴 $chorus 연습';
@@ -1283,10 +1286,9 @@ class _ResultsScreenState extends State<_ResultsScreen> {
     final recommended = recommendedChorusPractice(widget.results);
     final lost = widget.comboBreak;
     final venue = widget.venue;
-    final nextVenue =
-        venue == FestivalVenue.neighborhood &&
-        widget.missionAchieved &&
-        widget.records.nightMarketUnlocked;
+    final nextVenue = venue.next;
+    final canContinue =
+        nextVenue != null && widget.records.isUnlocked(nextVenue);
     final compact = MediaQuery.sizeOf(context).height < 480;
     return _Screen(
       title: '전체 결과',
@@ -1300,14 +1302,14 @@ class _ResultsScreenState extends State<_ResultsScreen> {
           compact: compact,
         ),
         if (!widget.saved) const Text('최고 기록을 저장하지 못했어요.'),
-        if (nextVenue)
+        if (canContinue)
           _Action(
-            '다음 무대 · 야외 야시장',
+            '다음 무대 · ${nextVenue.title}',
             () => _open(
               context,
               _PerformanceScreen(
                 records: widget.records,
-                venue: FestivalVenue.nightMarket,
+                venue: nextVenue,
                 returnHome: widget.returnHome,
               ),
               replace: true,
@@ -1367,7 +1369,7 @@ class _ResultsScreenState extends State<_ResultsScreen> {
             ),
             replace: true,
           ),
-          primary: !nextVenue,
+          primary: !canContinue,
         ),
         _Action(
           widget.returnHome ? '시작 화면으로' : '공연 선택으로',

@@ -14,8 +14,8 @@ final _context = AudioContext(
 );
 
 class FestivalAudio {
-  FestivalAudio(double volume)
-    : _music = _Clip('festival-first-show.wav', volume * .62),
+  FestivalAudio(double volume, FestivalVenue venue)
+    : _music = _Clip(venue.musicAsset, volume * .62),
       _generator = _Clip('sfx/generator-loop.wav', volume * .27, loop: true),
       _effects = {
         FestivalCue.call: _Clip('sfx/laureol-call.wav', volume * .78),

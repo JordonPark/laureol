@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laureol/festival_performance.dart';
 import 'package:laureol/festival_records.dart';
+import 'package:laureol/performance_controls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -22,11 +23,47 @@ void main() {
 
       final market = FestivalPerformance(venue: FestivalVenue.nightMarket)
         ..advanceTicks(24 * 8);
+      expect(records.isUnlocked(FestivalVenue.liveClub), isFalse);
       expect(market.eventNotice.$1, contains('야시장 소음'));
       market.advanceTicks(100 * 8 - market.tick);
       expect(await records.record(market), isTrue);
       expect(records.bestFor(FestivalVenue.nightMarket)?.score, market.score);
       expect(records.concertBest?.score, first.score);
+      expect(records.isUnlocked(FestivalVenue.liveClub), isTrue);
+      expect(records.isUnlocked(FestivalVenue.rooftop), isFalse);
+
+      for (final venue in [FestivalVenue.liveClub, FestivalVenue.rooftop]) {
+        expect(records.isUnlocked(venue), isTrue);
+        final performance = FestivalPerformance(venue: venue)
+          ..startMainConcert();
+        while (!performance.finished) {
+          for (final zone in FestivalZone.values) {
+            final target = performance.readyVolumeRange(zone);
+            final volume = performance.volume(zone);
+            if (volume < target.minimum || volume > target.maximum) {
+              performance.setVolume(
+                zone,
+                (target.minimum + target.maximum) ~/ 2,
+              );
+            }
+          }
+          if (performance.recommendedSignalZone case final zone?) {
+            expect(performance.signal(zone), SignalState.available);
+            performance.queue(zone);
+          }
+          performance.advanceTicks(1);
+        }
+        expect(performance.missionAchieved, isTrue);
+        expect(await records.record(performance), isTrue);
+        await preferences.reload();
+        final reloaded = FestivalRecords(preferences);
+        expect(reloaded.missionCompleted(venue), isTrue);
+        expect(reloaded.bestFor(venue)?.score, performance.score);
+        expect(
+          reloaded.bestFor(FestivalVenue.nightMarket)?.score,
+          market.score,
+        );
+      }
     },
   );
   test(

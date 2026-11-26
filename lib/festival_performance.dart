@@ -23,17 +23,78 @@ enum FestivalZone { front, back }
 enum FestivalCue { call, applause, singalong, generatorStop }
 
 enum FestivalVenue {
-  neighborhood('동네 축제', '두 줄이 8박 연속 떼창하기', 'venue-neighborhood.png'),
-  nightMarket('야외 야시장', '발전기가 꺼진 뒤 4박 안에 두 줄 합류시키기', 'venue-market.png');
+  neighborhood(
+    '동네 축제',
+    '두 줄이 8박 연속 떼창하기',
+    'venue-neighborhood.png',
+    'festival-first-show.wav',
+  ),
+  nightMarket(
+    '야외 야시장',
+    '발전기가 꺼진 뒤 4박 안에 두 줄 합류시키기',
+    'venue-market.png',
+    'night-market-step.wav',
+  ),
+  liveClub(
+    '지하 라이브클럽',
+    '마지막 후렴에서 두 줄이 함께 12박 떼창하기',
+    'venue-club.png',
+    'neon-break.wav',
+  ),
+  rooftop(
+    '옥상 공연',
+    '세 후렴 모두에서 두 줄이 함께 떼창하기',
+    'venue-rooftop.png',
+    'rooftop-encore.wav',
+  );
 
-  const FestivalVenue(this.title, this.mission, this.poster);
+  const FestivalVenue(this.title, this.mission, this.poster, this.musicAsset);
 
   final String title;
   final String mission;
   final String poster;
+  final String musicAsset;
 
   String get posterAsset => 'docs/art/festival/$poster';
+
+  bool get usesGenerator => this == neighborhood || this == nightMarket;
+
+  FestivalVenue? get next =>
+      index + 1 < values.length ? values[index + 1] : null;
+
+  String? get unlockHint => switch (this) {
+    neighborhood => null,
+    nightMarket => '동네 축제에서 두 줄 8박 연속 떼창으로 해금',
+    liveClub => '야외 야시장 완주로 해금',
+    rooftop => '지하 라이브클럽 완주로 해금',
+  };
 }
+
+class _MixChange {
+  const _MixChange(this.label, this.zone, this.start, this.end, this.gain);
+
+  final String label;
+  final FestivalZone zone;
+  final int start;
+  final int end;
+  final int gain;
+
+  bool activeAt(int second) => second >= start && second < end;
+}
+
+const _clubChanges = [
+  _MixChange('앞줄 모니터 증폭', FestivalZone.front, 21, 28, 16),
+  _MixChange('뒷벽 저음 반사', FestivalZone.back, 48, 56, 16),
+  _MixChange('앞줄 스피커 감쇠', FestivalZone.front, 76, 82, -16),
+  _MixChange('뒷줄 스피커 감쇠', FestivalZone.back, 84, 88, -16),
+];
+
+const _rooftopChanges = [
+  _MixChange('뒷줄에 맞바람', FestivalZone.back, 21, 29, -14),
+  _MixChange('앞줄에 맞바람', FestivalZone.front, 47, 56, -14),
+  _MixChange('뒷줄에 돌풍', FestivalZone.back, 76, 83, -16),
+  _MixChange('앞줄에 돌풍', FestivalZone.front, 85, 89, -16),
+];
 
 String _missingLabel(int mask) => switch (mask) {
   1 => '앞줄',
@@ -198,7 +259,9 @@ class FestivalPerformance {
     if (practiceChorus == 2 || practiceChorus == 3) {
       _volumes[FestivalZone.back.index] = 50;
     }
-    if (practiceChorus == 3) _volumes[FestivalZone.front.index] = 35;
+    if (practiceChorus == 3 && venue.usesGenerator) {
+      _volumes[FestivalZone.front.index] = 35;
+    }
     _refreshLevels();
     if (practiceChorus != null) _saveCheckpoint(practiceChorus!);
   }
@@ -257,6 +320,11 @@ class FestivalPerformance {
   final bool preserveRehearsalMix;
   final FestivalVenue venue;
   final ComboBreak? recovery;
+  List<_MixChange> get _mixChanges => switch (venue) {
+    FestivalVenue.liveClub => _clubChanges,
+    FestivalVenue.rooftop => _rooftopChanges,
+    _ => const [],
+  };
   int get _generatorEnd =>
       _generatorStopTick +
       (mastery || venue == FestivalVenue.nightMarket ? 2 * _ticksPerBeat : 0);
@@ -318,6 +386,9 @@ class FestivalPerformance {
   bool get missionAchieved => switch (venue) {
     FestivalVenue.neighborhood => _bestTogetherStreak >= 8,
     FestivalVenue.nightMarket => _marketMissionDone,
+    FestivalVenue.liveClub =>
+      _chorusBeats.last.where((beat) => beat == 3).length >= 12,
+    FestivalVenue.rooftop => _chorusBeats.every((beats) => beats.contains(3)),
   };
   int get rescueBeats => _rescueUntil == null
       ? 0
@@ -358,7 +429,9 @@ class FestivalPerformance {
       : 1;
 
   bool get generatorRunning =>
-      _tick >= 76 * _ticksPerSecond && _tick < _generatorEnd;
+      venue.usesGenerator &&
+      _tick >= 76 * _ticksPerSecond &&
+      _tick < _generatorEnd;
   Duration get generatorLoopPosition =>
       festivalTick * ((_tick - 76 * _ticksPerSecond) % (2 * _ticksPerSecond));
   bool get signalQueued => _reservedTick != null && _tick < _reservedTick!;
@@ -487,36 +560,16 @@ class FestivalPerformance {
           ? ('리허설 · 노란 신호 버튼을 기다려요', null)
           : ('리허설 · 뒷줄 볼륨을 밀어 ✓ 준비에 맞춰요', null);
     }
-    final due = switch (seconds) {
-      >= 46 && < 48 => ('앞줄 관객 접근', 48 * _ticksPerSecond),
-      >= 74 && < 76 => ('발전기 가동', 76 * _ticksPerSecond),
-      >= 76 && < 81 => ('발전기 정지', _generatorEnd),
-      _ => null,
-    };
-    if (seconds >= 78 && seconds < 81 && _reserved == null) {
-      if (generatorRunning) {
-        return (
-          '앞줄 먼저 시작 · 또는 발전기 정지까지 기다려요',
-          (_generatorEnd - _tick + _ticksPerBeat - 1) ~/ _ticksPerBeat,
-        );
-      }
-      return (
-        startsBothRows(FestivalZone.back)
-            ? '발전기 정지 · 두 줄 동시 시작 가능'
-            : '발전기 정지 · 목표 볼륨에 맞춰요',
-        null,
-      );
+    if (!venue.usesGenerator) {
+      if (signalQueued) return ('신호 예약 · 박자에 맞춰 떼창이 시작돼요', null);
+      if (_mixChangeNotice case final notice?) return notice;
+    } else {
+      if (_generatorVenueNotice case final notice?) return notice;
     }
-    if (due != null && _tick < due.$2) {
-      return (due.$1, (due.$2 - _tick + _ticksPerBeat - 1) ~/ _ticksPerBeat);
-    }
-    if (_tick >= _generatorEnd && seconds < 82) return ('발전기 정지 완료', null);
-    if (_marketNoise) return ('야시장 소음 · 뒷줄 볼륨을 올려요', null);
     final interlude = _interlude;
     if (interlude != null) {
       return (_interludeNotice(interlude.previous, interlude.next), null);
     }
-    if (seconds >= 48 && seconds < 50) return ('앞줄 체감 볼륨 증가', null);
     final chorus = _chorusAt(_tick);
     if (chorus != null &&
         chorus.number == 1 &&
@@ -553,6 +606,64 @@ class FestivalPerformance {
     return holdingCombo ? ('두 줄을 다시 맞추면 콤보가 이어져요', null) : ('다음 신호 준비', null);
   }
 
+  (String, int?)? get _generatorVenueNotice {
+    final due = switch (seconds) {
+      >= 46 && < 48 => ('앞줄 관객 접근', 48 * _ticksPerSecond),
+      >= 74 && < 76 => ('발전기 가동', 76 * _ticksPerSecond),
+      >= 76 && < 81 => ('발전기 정지', _generatorEnd),
+      _ => null,
+    };
+    if (seconds >= 78 && seconds < 81 && _reserved == null) {
+      if (generatorRunning) {
+        return (
+          '앞줄 먼저 시작 · 또는 발전기 정지까지 기다려요',
+          (_generatorEnd - _tick + _ticksPerBeat - 1) ~/ _ticksPerBeat,
+        );
+      }
+      return (
+        startsBothRows(FestivalZone.back)
+            ? '발전기 정지 · 두 줄 동시 시작 가능'
+            : '발전기 정지 · 목표 볼륨에 맞춰요',
+        null,
+      );
+    }
+    if (due != null && _tick < due.$2) {
+      return (due.$1, (due.$2 - _tick + _ticksPerBeat - 1) ~/ _ticksPerBeat);
+    }
+    if (_tick >= _generatorEnd && seconds < 82) return ('발전기 정지 완료', null);
+    if (_marketNoise) return ('야시장 소음 · 뒷줄 볼륨을 올려요', null);
+    if (seconds >= 48 && seconds < 50 && _interlude == null) {
+      return ('앞줄 체감 볼륨 증가', null);
+    }
+    return null;
+  }
+
+  (String, int?)? get _mixChangeNotice {
+    for (final change in _mixChanges) {
+      if (change.activeAt(seconds)) {
+        final until = change.end * _ticksPerSecond - _tick;
+        return until <= 2 * _ticksPerSecond
+            ? (
+                '${change.label} 끝',
+                (until + _ticksPerBeat - 1) ~/ _ticksPerBeat,
+              )
+            : (change.label, null);
+      }
+      if (seconds >= change.start - 2 && seconds < change.start) {
+        final until = change.start * _ticksPerSecond - _tick;
+        return (change.label, (until + _ticksPerBeat - 1) ~/ _ticksPerBeat);
+      }
+    }
+    return null;
+  }
+
+  FestivalZone? get activeMixZone {
+    for (final change in _mixChanges) {
+      if (change.activeAt(seconds)) return change.zone;
+    }
+    return null;
+  }
+
   bool get _marketNoise =>
       venue == FestivalVenue.nightMarket && seconds >= 24 && seconds < 28;
 
@@ -562,6 +673,9 @@ class FestivalPerformance {
       return together == 0
           ? '후렴 ${previous.number} 종료 · 다음은 두 줄을 맞춰요'
           : '후렴 ${previous.number} · 함께 떼창 ${(together / 2).toStringAsFixed(1)}초';
+    }
+    if (!venue.usesGenerator) {
+      return '다음 후렴 준비 · 민트색 눈금에 맞춰요';
     }
     final front = _levelFor(FestivalZone.front.index, _frontProximityBoost);
     if (next.number == 2) {
@@ -613,6 +727,7 @@ class FestivalPerformance {
       _levels.every((level) => level == CrowdStatus.ready);
 
   bool startsBothRows(FestivalZone zone) =>
+      venue.usesGenerator &&
       zone == FestivalZone.back &&
       _chorusAt(_tick)?.number == 3 &&
       _tick >= _generatorEnd &&
@@ -688,7 +803,9 @@ class FestivalPerformance {
     for (var step = 0; step < count && !finished; step++) {
       final previous = _chorusAt(_tick);
       _tick++;
-      if (_tick == _generatorEnd) _cues.add((FestivalCue.generatorStop, _tick));
+      if (venue.usesGenerator && _tick == _generatorEnd) {
+        _cues.add((FestivalCue.generatorStop, _tick));
+      }
       if (_tick % _ticksPerBeat != 0) continue;
 
       _awardPreviousBeat(previous);
@@ -832,16 +949,25 @@ class FestivalPerformance {
     }
   }
 
-  int _volumeModifier(FestivalZone zone) => zone == FestivalZone.front
-      ? (seconds >= 48 ? _frontProximityBoost : 0)
-      : generatorRunning
-      ? -16
-      : _marketNoise
-      ? -10
-      : 0;
+  int _volumeModifier(FestivalZone zone) {
+    if (venue.usesGenerator) {
+      if (zone == FestivalZone.front) {
+        return seconds >= 48 ? _frontProximityBoost : 0;
+      }
+      if (generatorRunning) return -16;
+      return _marketNoise ? -10 : 0;
+    }
+    for (final change in _mixChanges) {
+      if (change.zone == zone && change.activeAt(seconds)) return change.gain;
+    }
+    return 0;
+  }
 
   int _mixModifier(FestivalZone zone) =>
-      zone == FestivalZone.front && seconds < 48 && _interlude != null
+      venue.usesGenerator &&
+          zone == FestivalZone.front &&
+          seconds < 48 &&
+          _interlude != null
       ? _frontProximityBoost
       : _volumeModifier(zone);
 
