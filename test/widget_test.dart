@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laureol/festival_performance.dart';
@@ -6,6 +8,9 @@ import 'package:laureol/festival_scene.dart';
 import 'package:laureol/main.dart';
 import 'package:laureol/performance_controls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+Finder _dialGesture(Finder slider) =>
+    find.descendant(of: slider, matching: find.byType(RawGestureDetector));
 
 void main() {
   late FestivalRecords records;
@@ -47,13 +52,7 @@ void main() {
     await tester.pump(const Duration(seconds: 25));
     expect(scene().tick, 0);
 
-    final rearTrack = find.descendant(
-      of: rear,
-      matching: find.byWidgetPredicate(
-        (widget) =>
-            widget is GestureDetector && widget.onVerticalDragUpdate != null,
-      ),
-    );
+    final rearTrack = _dialGesture(rear);
     final track = tester.getRect(rearTrack);
     final gesture = await tester.startGesture(
       Offset(track.center.dx, track.top + track.height * .60),
@@ -90,6 +89,59 @@ void main() {
     await tester.tap(find.text('동네 축제 시작'));
     await tester.pumpAndSettle();
     expect(scene().tick, greaterThanOrEqualTo(160));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('The rim tracks clockwise and counterclockwise turns', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 740));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(LaureolApp(records: records));
+    await tester.tap(find.text('공연 시작'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('동네 축제 시작'));
+    await tester.pumpAndSettle();
+
+    final slider = find.byType(ZoneVolumeSlider).first;
+    final bounds = tester.getRect(_dialGesture(slider));
+    Offset rim(double degrees) {
+      final angle = degrees * math.pi / 180;
+      return bounds.center +
+          Offset(math.cos(angle), math.sin(angle)) * (bounds.width * .38);
+    }
+
+    int volume() => tester.widget<ZoneVolumeSlider>(slider).value;
+
+    expect(volume(), 50);
+    final turn = await tester.startGesture(rim(170));
+    await turn.moveTo(rim(190));
+    await tester.pump();
+    expect(volume(), 57);
+    await turn.moveTo(rim(217));
+    await tester.pump();
+    expect(volume(), 67);
+    await turn.moveTo(rim(190));
+    await tester.pump();
+    expect(volume(), 57);
+    await turn.up();
+
+    final regrip = await tester.startGesture(rim(260));
+    await tester.pump();
+    expect(volume(), 57);
+    await regrip.moveTo(rim(233));
+    await regrip.up();
+    await tester.pump();
+    expect(volume(), 47);
+
+    final across = await tester.startGesture(rim(0));
+    await across.moveTo(rim(180));
+    await tester.pump();
+    expect(volume(), 47);
+    await across.moveTo(rim(207));
+    await across.up();
+    await tester.pump();
+    expect(volume(), 57);
     expect(tester.takeException(), isNull);
   });
 
@@ -205,13 +257,7 @@ void main() {
         FestivalZone.front,
       );
       expect(tester.widget<ZoneControlCard>(cards.first).selected, isTrue);
-      final backTrack = find.descendant(
-        of: find.byType(ZoneVolumeSlider).last,
-        matching: find.byWidgetPredicate(
-          (widget) =>
-              widget is GestureDetector && widget.onVerticalDragUpdate != null,
-        ),
-      );
+      final backTrack = _dialGesture(find.byType(ZoneVolumeSlider).last);
       final backBounds = tester.getRect(backTrack);
       await tester.drag(backTrack, const Offset(0, -21));
       await tester.pump();
@@ -343,13 +389,7 @@ void main() {
     expect(scene().compact, isTrue);
     await tester.pump(Duration(milliseconds: (176 - scene().tick) * 125));
     final rearSlider = find.byType(ZoneVolumeSlider).last;
-    final track = find.descendant(
-      of: rearSlider,
-      matching: find.byWidgetPredicate(
-        (widget) =>
-            widget is GestureDetector && widget.onVerticalDragUpdate != null,
-      ),
-    );
+    final track = _dialGesture(rearSlider);
     expect(tester.getSize(track).height, greaterThanOrEqualTo(48));
     expect(tester.getSize(track).width, greaterThanOrEqualTo(76));
     await tester.drag(track, const Offset(0, -30));
@@ -439,13 +479,7 @@ void main() {
         tester.widget<FestivalScene>(find.byType(FestivalScene));
     Future<void> advanceTo(int tick) =>
         tester.pump(festivalTick * (tick - scene().tick));
-    final rearTrack = find.descendant(
-      of: find.byType(ZoneVolumeSlider).last,
-      matching: find.byWidgetPredicate(
-        (widget) =>
-            widget is GestureDetector && widget.onVerticalDragUpdate != null,
-      ),
-    );
+    final rearTrack = _dialGesture(find.byType(ZoneVolumeSlider).last);
     const missedTick = 248;
     await advanceTo(176);
     await tester.drag(rearTrack, const Offset(0, -30));

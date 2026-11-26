@@ -1,6 +1,11 @@
 import 'dart:math' as math;
 
-import 'package:flutter/gestures.dart' show DragStartBehavior;
+import 'package:flutter/gestures.dart'
+    show
+        DeviceGestureSettings,
+        DragStartBehavior,
+        PanGestureRecognizer,
+        TapGestureRecognizer;
 import 'package:flutter/widgets.dart';
 
 const _ink = Color(0xFFF6F0E7);
@@ -38,6 +43,21 @@ enum SignalState {
 }
 
 enum MixCue { none, adjust, signal }
+
+enum VolumeDialStyle {
+  front(Color(0xFF89D8CB), Color(0xFF3D7A74), Color(0xFF183735), 8),
+  back(Color(0xFFEAB681), Color(0xFF98643E), Color(0xFF482D2A), 6);
+
+  const VolumeDialStyle(this.lit, this.finish, this.edge, this.grips);
+
+  final Color lit;
+  final Color finish;
+  final Color edge;
+  final int grips;
+}
+
+const _dialStart = 3 * math.pi / 4;
+const _dialSweep = 3 * math.pi / 2;
 
 class CrowdStatusBadge extends StatelessWidget {
   const CrowdStatusBadge({
@@ -88,6 +108,7 @@ class ZoneVolumeSlider extends StatelessWidget {
     this.enabled = true,
     this.highlighted = false,
     this.vertical = false,
+    this.dialStyle = VolumeDialStyle.front,
     this.target,
     this.onInteractionEnd,
   }) : assert(value >= 0 && value <= 100);
@@ -98,6 +119,7 @@ class ZoneVolumeSlider extends StatelessWidget {
   final bool enabled;
   final bool highlighted;
   final bool vertical;
+  final VolumeDialStyle dialStyle;
   final ({int minimum, int maximum})? target;
   final VoidCallback? onInteractionEnd;
 
@@ -132,6 +154,7 @@ class ZoneVolumeSlider extends StatelessWidget {
                 band: band,
                 highlighted: highlighted,
                 enabled: enabled,
+                style: dialStyle,
                 onChanged: onChanged,
                 onInteractionEnd: onInteractionEnd,
               )
@@ -268,6 +291,7 @@ class _VolumeDialGesture extends StatefulWidget {
     required this.band,
     required this.highlighted,
     required this.enabled,
+    required this.style,
     required this.onChanged,
     required this.onInteractionEnd,
   });
@@ -276,6 +300,7 @@ class _VolumeDialGesture extends StatefulWidget {
   final ({int minimum, int maximum})? band;
   final bool highlighted;
   final bool enabled;
+  final VolumeDialStyle style;
   final ValueChanged<int> onChanged;
   final VoidCallback? onInteractionEnd;
 
@@ -285,23 +310,46 @@ class _VolumeDialGesture extends StatefulWidget {
 
 class _VolumeDialGestureState extends State<_VolumeDialGesture> {
   static const _pixelsPerPoint = 3.0;
+  static const _dragSettings = DeviceGestureSettings(touchSlop: 3.5);
 
-  int _startVolume = 0;
-  double _dragDistance = 0;
+  double _dragValue = 0;
+  bool _turning = false;
+
+  void _startDrag(DragStartDetails details, double side) {
+    final relative = details.localPosition - Offset(side / 2, side / 2);
+    _dragValue = widget.value.toDouble();
+    _turning = relative.distance >= side * .22;
+  }
+
+  void _drag(DragUpdateDetails details, double side) {
+    if (!_turning) {
+      _adjust(-details.delta.dy / _pixelsPerPoint);
+      return;
+    }
+    final delta = details.delta;
+    if (delta == Offset.zero) return;
+    final current = details.localPosition - Offset(side / 2, side / 2);
+    final previous = current - delta;
+    // A swipe across the center has no well-defined turning direction.
+    final projection =
+        -(previous.dx * delta.dx + previous.dy * delta.dy) /
+        delta.distanceSquared;
+    final nearest = previous + delta * projection.clamp(0.0, 1.0);
+    if (nearest.distance < side * .12) return;
+    final change =
+        (current.direction - previous.direction + math.pi) % (2 * math.pi) -
+        math.pi;
+    _adjust(change * 100 / _dialSweep);
+  }
+
+  void _adjust(double delta) {
+    _dragValue = (_dragValue + delta).clamp(0.0, 100.0);
+    _update(_dragValue.round());
+  }
 
   void _update(int next) {
     final value = next.clamp(0, 100);
     if (value != widget.value) widget.onChanged(value);
-  }
-
-  void _startDrag(DragStartDetails _) {
-    _startVolume = widget.value;
-    _dragDistance = 0;
-  }
-
-  void _drag(DragUpdateDetails details) {
-    _dragDistance -= details.delta.dy;
-    _update(_startVolume + (_dragDistance / _pixelsPerPoint).round());
   }
 
   void _tap(TapUpDetails details, double height) {
@@ -320,15 +368,33 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
           math.min(bounds.maxWidth, bounds.maxHeight),
         );
         return Center(
-          child: GestureDetector(
+          child: RawGestureDetector(
             behavior: HitTestBehavior.opaque,
-            dragStartBehavior: DragStartBehavior.down,
-            onTapUp: widget.enabled ? (details) => _tap(details, side) : null,
-            onVerticalDragStart: widget.enabled ? _startDrag : null,
-            onVerticalDragUpdate: widget.enabled ? _drag : null,
-            onVerticalDragEnd: widget.enabled
-                ? (_) => widget.onInteractionEnd?.call()
-                : null,
+            excludeFromSemantics: true,
+            gestures: {
+              if (widget.enabled) ...{
+                TapGestureRecognizer:
+                    GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+                      TapGestureRecognizer.new,
+                      (recognizer) =>
+                          recognizer.onTapUp = (details) => _tap(details, side),
+                    ),
+                PanGestureRecognizer:
+                    GestureRecognizerFactoryWithHandlers<PanGestureRecognizer>(
+                      PanGestureRecognizer.new,
+                      (recognizer) {
+                        recognizer
+                          ..gestureSettings = _dragSettings
+                          ..dragStartBehavior = DragStartBehavior.down;
+                        recognizer.onStart = (details) =>
+                            _startDrag(details, side);
+                        recognizer.onUpdate = (details) => _drag(details, side);
+                        recognizer.onEnd = (_) =>
+                            widget.onInteractionEnd?.call();
+                      },
+                    ),
+              },
+            },
             child: SizedBox.square(
               dimension: side,
               child: CustomPaint(
@@ -337,6 +403,7 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
                   band: widget.band,
                   highlighted: widget.highlighted,
                   enabled: widget.enabled,
+                  style: widget.style,
                 ),
               ),
             ),
@@ -353,96 +420,200 @@ class _VolumeDialPainter extends CustomPainter {
     required this.band,
     required this.highlighted,
     required this.enabled,
+    required this.style,
   });
 
   final int value;
   final ({int minimum, int maximum})? band;
   final bool highlighted;
   final bool enabled;
-
-  static const _start = 3 * math.pi / 4;
-  static const _sweep = 3 * math.pi / 2;
+  final VolumeDialStyle style;
 
   @override
   void paint(Canvas canvas, Size size) {
     final origin = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - 11;
-    if (radius <= 7) return;
-    final ring = Rect.fromCircle(center: origin, radius: radius);
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..color = _line;
-    canvas.drawArc(ring, _start, _sweep, false, paint);
-    final angle = _start + _sweep * value / 100;
-    if (band case final target?) {
-      canvas.drawArc(
-        ring,
-        _start + _sweep * target.minimum / 100,
-        _sweep * (target.maximum - target.minimum) / 100,
-        false,
-        paint..color = _mint,
-      );
-    }
+    final radius = size.shortestSide / 2 - 12;
+    if (radius <= 12) return;
+
+    final angle = _dialStart + _dialSweep * value / 100;
     Offset radial(double heading, double distance) =>
         origin + Offset(math.cos(heading), math.sin(heading)) * distance;
 
-    final faceRadius = radius - 7;
-    canvas.drawCircle(
-      origin,
-      faceRadius,
-      paint
-        ..style = PaintingStyle.fill
-        ..color = const Color(0xFF39314E),
+    final ring = Rect.fromCircle(center: origin, radius: radius);
+    final stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..color = const Color(0xFF100F1A);
+    canvas.drawArc(ring, _dialStart, _dialSweep, false, stroke);
+    canvas.drawArc(
+      ring,
+      _dialStart,
+      angle - _dialStart,
+      false,
+      stroke
+        ..strokeWidth = 2.5
+        ..color = style.finish,
     );
-    final accent = !enabled
+    for (var index = 0; index <= 16; index++) {
+      final tick = _dialStart + _dialSweep * index / 16;
+      final major = index % 4 == 0;
+      canvas.drawLine(
+        radial(tick, radius + 4),
+        radial(tick, radius + (major ? 8 : 6)),
+        stroke
+          ..strokeWidth = major ? 1.75 : 1
+          ..color = major ? _muted : _line,
+      );
+    }
+    if (band case final target?) {
+      canvas.drawArc(
+        ring,
+        _dialStart + _dialSweep * target.minimum / 100,
+        _dialSweep * (target.maximum - target.minimum) / 100,
+        false,
+        stroke
+          ..color = _mint
+          ..strokeWidth = 4,
+      );
+    }
+
+    final pointer = !enabled
         ? _muted
         : highlighted
         ? _amber
         : _ink;
+    final gripRadius = radius - 7;
     canvas.drawCircle(
-      origin,
-      faceRadius,
-      paint
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..color = accent.withAlpha(130),
+      origin.translate(0, 2),
+      gripRadius + 1.5,
+      Paint()..color = const Color(0xFF0C0D16),
     );
-    canvas.drawLine(
-      radial(angle, faceRadius * .36),
-      radial(angle, radius),
-      paint
-        ..strokeWidth = 3
-        ..color = accent,
-    );
+    canvas.save();
+    canvas.translate(origin.dx, origin.dy);
+    canvas.rotate(angle + math.pi / 2);
+    _paintCap(canvas, gripRadius, pointer);
+    canvas.restore();
+    canvas.drawCircle(radial(angle, radius), 2.3, Paint()..color = pointer);
 
-    if (band case final target? when enabled && highlighted) {
+    if (band case final target?
+        when enabled &&
+            highlighted &&
+            (value < target.minimum || value > target.maximum)) {
       final direction = value < target.minimum ? -1.0 : 1.0;
-      final y = origin.dy + direction * (radius + 8);
+      final y = origin.dy + direction * (radius + 9);
       final arrow = Path()
         ..moveTo(origin.dx - 5, y - direction * 3)
         ..lineTo(origin.dx, y + direction * 2)
         ..lineTo(origin.dx + 5, y - direction * 3);
       canvas.drawPath(
         arrow,
-        paint
+        stroke
           ..strokeWidth = 2
           ..color = _mint,
       );
     }
     if (enabled) {
-      paint
-        ..color = _muted
-        ..strokeWidth = 1.5;
-      final x = size.width - 8;
-      canvas.drawLine(Offset(x - 3, 9), Offset(x + 3, 9), paint);
-      canvas.drawLine(Offset(x, 6), Offset(x, 12), paint);
-      canvas.drawLine(
-        Offset(x - 3, size.height - 9),
-        Offset(x + 3, size.height - 9),
-        paint,
+      _paintKey(canvas, Offset(size.width - 8, 8), add: true);
+      _paintKey(canvas, Offset(size.width - 8, size.height - 8), add: false);
+    }
+  }
+
+  void _paintCap(Canvas canvas, double radius, Color pointer) {
+    final outline = Path();
+    final step = 2 * math.pi / style.grips;
+    for (var index = 0; index < style.grips; index++) {
+      for (final (offset, depth) in [
+        (-.5, .86),
+        (-.29, 1.0),
+        (.29, 1.0),
+        (.5, .86),
+      ]) {
+        final angle = step * (index + offset) - math.pi / 2;
+        final point =
+            Offset(math.cos(angle), math.sin(angle)) * (radius * depth);
+        if (index == 0 && offset == -.5) {
+          outline.moveTo(point.dx, point.dy);
+        } else {
+          outline.lineTo(point.dx, point.dy);
+        }
+      }
+    }
+    outline.close();
+    final edge = enabled ? style.edge : const Color(0xFF292836);
+    final finish = enabled ? style.finish : const Color(0xFF535365);
+    final lit = enabled ? style.lit : _muted;
+    final bevel = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [lit, finish, edge],
+    );
+    final paint = Paint()
+      ..shader = bevel.createShader(
+        Rect.fromCircle(center: Offset.zero, radius: radius),
       );
+    canvas.drawPath(outline, paint);
+    paint.shader = null;
+    canvas.drawPath(
+      outline,
+      paint
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = edge,
+    );
+    final face = Rect.fromCircle(center: Offset.zero, radius: radius * .73);
+    canvas.drawCircle(
+      Offset.zero,
+      face.width / 2,
+      paint
+        ..style = PaintingStyle.fill
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [finish, edge],
+        ).createShader(face),
+    );
+    paint.shader = null;
+    canvas.drawArc(
+      face,
+      math.pi,
+      math.pi,
+      false,
+      paint
+        ..style = PaintingStyle.stroke
+        ..color = lit.withAlpha(165),
+    );
+    final slot = RRect.fromRectAndRadius(
+      Rect.fromLTRB(-2, -radius * .95, 2, -radius * .42),
+      const Radius.circular(1),
+    );
+    canvas.drawRRect(
+      slot,
+      paint
+        ..style = PaintingStyle.fill
+        ..color = pointer,
+    );
+  }
+
+  void _paintKey(Canvas canvas, Offset center, {required bool add}) {
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: center, width: 14, height: 14),
+      const Radius.circular(3),
+    );
+    final paint = Paint()..color = const Color(0xFF141520);
+    canvas.drawRRect(rect, paint);
+    canvas.drawRRect(
+      rect,
+      paint
+        ..style = PaintingStyle.stroke
+        ..color = _line,
+    );
+    paint
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round
+      ..color = _ink;
+    canvas.drawLine(center.translate(-3, 0), center.translate(3, 0), paint);
+    if (add) {
+      canvas.drawLine(center.translate(0, -3), center.translate(0, 3), paint);
     }
   }
 
@@ -451,7 +622,8 @@ class _VolumeDialPainter extends CustomPainter {
       value != oldDelegate.value ||
       band != oldDelegate.band ||
       highlighted != oldDelegate.highlighted ||
-      enabled != oldDelegate.enabled;
+      enabled != oldDelegate.enabled ||
+      style != oldDelegate.style;
 }
 
 class _VolumeCuePainter extends CustomPainter {
@@ -887,6 +1059,7 @@ class ZoneControlCard extends StatelessWidget {
   const ZoneControlCard({
     super.key,
     required this.zone,
+    required this.dialStyle,
     required this.status,
     required this.volume,
     required this.onVolumeChanged,
@@ -899,6 +1072,7 @@ class ZoneControlCard extends StatelessWidget {
   });
 
   final String zone;
+  final VolumeDialStyle dialStyle;
   final CrowdStatus status;
   final int volume;
   final ValueChanged<int> onVolumeChanged;
@@ -954,6 +1128,7 @@ class ZoneControlCard extends StatelessWidget {
                 highlighted: cue == MixCue.adjust,
                 target: target,
                 vertical: true,
+                dialStyle: dialStyle,
                 enabled: enabled,
                 onInteractionEnd: onInteractionEnd,
               ),
