@@ -293,14 +293,30 @@ void main() {
   test('Generator follows the timeline even without a queued signal', () {
     final performance = FestivalPerformance(practiceChorus: 3);
     expect(performance.eventNotice, ('발전기 가동', 4));
+    expect(performance.readyVolumeRange(FestivalZone.back), (
+      minimum: 46,
+      maximum: 58,
+    ));
     _at(performance, 76);
     expect(performance.generatorRunning, isTrue);
     expect(performance.generatorLoopPosition, Duration.zero);
     expect(performance.status(FestivalZone.back), CrowdStatus.quiet);
+    expect(performance.readyVolumeRange(FestivalZone.front), (
+      minimum: 32,
+      maximum: 44,
+    ));
+    expect(performance.readyVolumeRange(FestivalZone.back), (
+      minimum: 62,
+      maximum: 74,
+    ));
     expect(performance.eventNotice, ('발전기 정지', 7));
     _at(performance, 79.5);
     expect(performance.takeRecentCues(), [FestivalCue.generatorStop]);
     expect(performance.generatorRunning, isFalse);
+    expect(performance.readyVolumeRange(FestivalZone.back), (
+      minimum: 46,
+      maximum: 58,
+    ));
     expect(performance.recommendedSignalZone, FestivalZone.back);
     expect(performance.startsBothRows(FestivalZone.back), isTrue);
     expect(performance.cueFor(FestivalZone.front), MixCue.signal);
@@ -313,6 +329,22 @@ void main() {
     _at(performance, 90);
     expect(performance.score, 21);
     expect(performance.finished, isTrue);
+  });
+
+  test('Old checkpoints preserve volume but use independent readiness', () {
+    final checkpoint = ChorusCheckpoint.fromRecord([
+      1,
+      160,
+      58,
+      66,
+      CrowdStatus.loud.index,
+      CrowdStatus.loud.index,
+    ])!;
+    final replay = FestivalPerformance.replay(checkpoint);
+    expect(replay.volume(FestivalZone.front), 58);
+    expect(replay.volume(FestivalZone.back), 66);
+    expect(replay.status(FestivalZone.front), CrowdStatus.ready);
+    expect(replay.status(FestivalZone.back), CrowdStatus.loud);
   });
 
   test('Replay uses the original audio offset and drops expired cues', () {

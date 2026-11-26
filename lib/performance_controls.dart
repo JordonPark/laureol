@@ -986,7 +986,7 @@ class ZoneControlCard extends StatelessWidget {
         ),
         foregroundDecoration: BoxDecoration(
           border: Border.all(
-            color: status.color.withAlpha(selected || needsRescue ? 255 : 180),
+            color: status.color.withAlpha(needsRescue ? 255 : 180),
             width: 2,
           ),
           borderRadius: BorderRadius.circular(10),
@@ -1001,8 +1001,8 @@ class ZoneControlCard extends StatelessWidget {
                   children: [
                     Text(
                       zone,
-                      style: const TextStyle(
-                        color: _ink,
+                      style: TextStyle(
+                        color: selected ? _ink : _muted,
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),

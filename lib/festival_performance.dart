@@ -10,8 +10,8 @@ const _quickInterludeLength = 2 * _ticksPerSecond;
 const _outroLength = 2 * _ticksPerSecond;
 const _joinGrace = 3 * _ticksPerSecond;
 const _frontProximityBoost = 14;
-const _readyMinimum = 56;
-const _readyMaximum = 68;
+const _readyMinimum = 46;
+const _readyMaximum = 58;
 const _generatorStopTick = 79 * _ticksPerSecond + _ticksPerBeat;
 const _rescueBeats = 2;
 const _rewindTicks = 3 * _ticksPerSecond;
@@ -217,9 +217,10 @@ class FestivalPerformance {
     performance._tick = checkpoint.tick;
     performance._volumes.setAll(0, checkpoint._volumes);
     performance._levels.setAll(0, checkpoint._levels);
+    performance._refreshLevels();
     performance._signalEarlierBeats[checkpoint.chorus - 1] =
         checkpoint._signalEarlierBeats;
-    performance._checkpoints[checkpoint.chorus - 1] = checkpoint;
+    performance._saveCheckpoint(checkpoint.chorus);
     return performance;
   }
 
@@ -588,10 +589,10 @@ class FestivalPerformance {
   int volume(FestivalZone zone) => _volumes[zone.index];
 
   ({int minimum, int maximum}) readyVolumeRange(FestivalZone zone) {
-    final spill = _volumes[1 - zone.index] / 5 + _mixModifier(zone);
+    final modifier = _mixModifier(zone);
     return (
-      minimum: (_readyMinimum - spill).ceil(),
-      maximum: (_readyMaximum - spill).floor(),
+      minimum: _readyMinimum - modifier,
+      maximum: _readyMaximum - modifier,
     );
   }
 
@@ -852,10 +853,7 @@ class FestivalPerformance {
   }
 
   CrowdStatus _levelFor(int index, int modifier) {
-    final heard = (_volumes[index] + _volumes[1 - index] / 5 + modifier).clamp(
-      0,
-      100,
-    );
+    final heard = _volumes[index] + modifier;
     final margin =
         _levels[index] == CrowdStatus.ready &&
             (!preserveRehearsalMix || concertStarted)

@@ -148,7 +148,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Rear input updates the front target without moving its dial', (
+  testWidgets('Both mixer targets and readiness stay independent of input', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 740));
@@ -170,57 +170,50 @@ void main() {
     final rearBefore = dial(sliders.last);
     expect(frontBefore.foregroundPainter, isNotNull);
     expect(rearBefore.foregroundPainter, isNotNull);
-    final frontBounds = tester.getRect(_dialGesture(sliders.first));
-    expect(tester.widget<ZoneVolumeSlider>(sliders.first).target, (
-      minimum: 48,
-      maximum: 60,
-    ));
+    FestivalScene scene() => tester.widget(find.byType(FestivalScene));
+    const targets = (minimum: 46, maximum: 58);
+    ZoneVolumeSlider slider(Finder knob) => tester.widget(knob);
+    expect(slider(sliders.first).target, targets);
+    expect(slider(sliders.last).target, targets);
 
     await tester.drag(_dialGesture(sliders.last), const Offset(0, -60));
     await tester.pump();
-    expect(tester.widget<ZoneVolumeSlider>(sliders.last).value, 60);
-    expect(tester.widget<ZoneVolumeSlider>(sliders.first).target, (
-      minimum: 44,
-      maximum: 56,
-    ));
-    expect(
-      dial(sliders.first).foregroundPainter!
-          .shouldRepaint(frontBefore.foregroundPainter!),
-      isTrue,
-    );
+    expect(slider(sliders.last).value, 60);
+    expect(slider(sliders.first).value, 50);
+    expect(scene().front, CrowdStatus.ready);
 
     await tester.drag(_dialGesture(sliders.last), const Offset(0, 180));
     await tester.pump();
-    expect(tester.widget<ZoneVolumeSlider>(sliders.first).value, 50);
-    expect(tester.widget<ZoneVolumeSlider>(sliders.last).value, 0);
-    expect(
-      tester.widget<FestivalScene>(find.byType(FestivalScene)).front,
-      CrowdStatus.quiet,
-    );
-    expect(find.textContaining('목표 56'), findsNothing);
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('앞줄 볼륨'))
-          .getSemanticsData()
-          .value,
-      '50%, 준비 구간 56%에서 68%',
-    );
-    expect(tester.getRect(_dialGesture(sliders.first)), frontBounds);
+    expect(slider(sliders.first).value, 50);
+    expect(slider(sliders.last).value, 0);
+    expect(scene().front, CrowdStatus.ready);
     expect(
       dial(sliders.first).painter!.shouldRepaint(frontBefore.painter!),
       isFalse,
     );
-    expect(
-      dial(sliders.last).painter!.shouldRepaint(rearBefore.painter!),
-      isTrue,
-    );
 
-    final inactive = dial(sliders.first).foregroundPainter!;
-    await tester.tap(_dialGesture(sliders.first));
+    await tester.drag(_dialGesture(sliders.last), const Offset(0, -150));
     await tester.pump();
-    expect(tester.widget<ZoneVolumeSlider>(sliders.first).value, 50);
+    final rearReady = dial(sliders.last);
+    expect(scene().back, CrowdStatus.ready);
+
+    await tester.drag(_dialGesture(sliders.first), const Offset(0, 150));
+    await tester.pump();
+    expect(slider(sliders.first).value, 0);
+    expect(slider(sliders.last).value, 50);
+    expect(scene().back, CrowdStatus.ready);
     expect(
-      dial(sliders.first).foregroundPainter!.shouldRepaint(inactive),
+      dial(sliders.last).painter!.shouldRepaint(rearReady.painter!),
+      isFalse,
+    );
+    expect(
+      dial(sliders.first).foregroundPainter!
+          .shouldRepaint(frontBefore.foregroundPainter!),
+      isFalse,
+    );
+    expect(
+      dial(sliders.last).foregroundPainter!
+          .shouldRepaint(rearBefore.foregroundPainter!),
       isFalse,
     );
   });
@@ -541,7 +534,7 @@ void main() {
     expect(find.byType(SignalButton), findsOneWidget);
     await tester.drag(track, const Offset(0, 150));
     await tester.pump();
-    expect(scene().front, CrowdStatus.quiet);
+    expect(scene().front, CrowdStatus.ready);
     expect(scene().back, CrowdStatus.quiet);
     expect(
       tester.widget<SignalButton>(find.byType(SignalButton)).onPressed,
