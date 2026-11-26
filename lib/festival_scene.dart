@@ -154,6 +154,8 @@ class FestivalScene extends StatefulWidget {
     this.onZoneSelected,
     this.venue = FestivalVenue.neighborhood,
     this.lightingTier = 0,
+    this.combo = 0,
+    this.holdingCombo = false,
     this.comboEffect,
     this.frontCue = MixCue.none,
     this.backCue = MixCue.none,
@@ -174,6 +176,8 @@ class FestivalScene extends StatefulWidget {
   final ValueChanged<FestivalZone>? onZoneSelected;
   final FestivalVenue venue;
   final int lightingTier;
+  final int combo;
+  final bool holdingCombo;
   final ({int count, int elapsedTicks})? comboEffect;
   final MixCue frontCue;
   final MixCue backCue;
@@ -289,6 +293,29 @@ class _FestivalSceneState extends State<FestivalScene> {
                     ),
                     if (widget.onZoneSelected != null)
                       LayoutBuilder(builder: _audienceTargets),
+                    if (widget.combo > 0 && widget.comboEffect == null)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: const Color(0xE6171529),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              child: ComboBadge(
+                                count: widget.combo,
+                                holding: widget.holdingCombo,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     if (widget.comboEffect case final celebration?)
                       _ComboCelebration(
                         count: celebration.count,

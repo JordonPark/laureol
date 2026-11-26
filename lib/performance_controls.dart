@@ -110,8 +110,6 @@ class ZoneVolumeSlider extends StatelessWidget {
     this.highlighted = false,
     this.vertical = false,
     this.dialStyle = VolumeDialStyle.front,
-    this.showDialTarget = false,
-    this.dialStatus = _mint,
     this.target,
     this.onInteractionStart,
     this.onInteractionEnd,
@@ -124,8 +122,6 @@ class ZoneVolumeSlider extends StatelessWidget {
   final bool highlighted;
   final bool vertical;
   final VolumeDialStyle dialStyle;
-  final bool showDialTarget;
-  final Color dialStatus;
   final ({int minimum, int maximum})? target;
   final VoidCallback? onInteractionStart;
   final VoidCallback? onInteractionEnd;
@@ -161,8 +157,7 @@ class ZoneVolumeSlider extends StatelessWidget {
                 value: value,
                 enabled: enabled,
                 style: dialStyle,
-                guide: enabled && showDialTarget ? band : null,
-                statusColor: dialStatus,
+                guide: band,
                 onChanged: onChanged,
                 onInteractionStart: onInteractionStart,
                 onInteractionEnd: onInteractionEnd,
@@ -300,7 +295,6 @@ class _VolumeDialGesture extends StatefulWidget {
     required this.enabled,
     required this.style,
     required this.guide,
-    required this.statusColor,
     required this.onChanged,
     required this.onInteractionStart,
     required this.onInteractionEnd,
@@ -310,7 +304,6 @@ class _VolumeDialGesture extends StatefulWidget {
   final bool enabled;
   final VolumeDialStyle style;
   final ({int minimum, int maximum})? guide;
-  final Color statusColor;
   final ValueChanged<int> onChanged;
   final VoidCallback? onInteractionStart;
   final VoidCallback? onInteractionEnd;
@@ -319,61 +312,96 @@ class _VolumeDialGesture extends StatefulWidget {
   State<_VolumeDialGesture> createState() => _VolumeDialGestureState();
 }
 
+enum _DialMotion { slide, turn }
+
 class _VolumeDialGestureState extends State<_VolumeDialGesture> {
   static const _pixelsPerPoint = 3.0;
-  static const _dragSettings = DeviceGestureSettings(touchSlop: 3.5);
+  static const _dragSettings = DeviceGestureSettings(touchSlop: 1.5);
 
-  double _dragValue = 0;
-  bool _turning = false;
+  double? _dragValue;
+  late int _lastDragVolume;
+  _DialMotion? _motion;
 
-  void _startDrag(DragStartDetails details, double side) {
-    final relative = details.localPosition - Offset(side / 2, side / 2);
+  void _startDrag(DragStartDetails _) {
     _dragValue = widget.value.toDouble();
-    _turning = relative.distance >= side * .22;
+    _lastDragVolume = widget.value;
+    _motion = null;
     widget.onInteractionStart?.call();
   }
 
   void _drag(DragUpdateDetails details, double side) {
-    if (!_turning) {
-      _adjust(-details.delta.dy / _pixelsPerPoint);
-      return;
-    }
     final delta = details.delta;
     if (delta == Offset.zero) return;
     final current = details.localPosition - Offset(side / 2, side / 2);
     final previous = current - delta;
-    // A swipe across the center has no well-defined turning direction.
+
+    _motion ??= _recognizeMotion(previous, delta, side);
+    if (_motion == _DialMotion.slide) {
+      _adjust(-delta.dy / _pixelsPerPoint);
+      return;
+    }
+    if (_motion != _DialMotion.turn) return;
+
+    // Angle estimates become noisy near the center. Reduce their influence
+    // gradually so a thumb that drifts inward can keep turning.
     final projection =
         -(previous.dx * delta.dx + previous.dy * delta.dy) /
         delta.distanceSquared;
     final nearest = previous + delta * projection.clamp(0.0, 1.0);
-    if (nearest.distance < side * .12) return;
+    final turnWeight = ((nearest.distance - 4) / (side * .21 - 4)).clamp(
+      0.0,
+      1.0,
+    );
     final change =
         (current.direction - previous.direction + math.pi) % (2 * math.pi) -
         math.pi;
-    _adjust(change * 100 / _dialSweep);
+    _adjust(change * 100 / _dialSweep * turnWeight);
+  }
+
+  _DialMotion? _recognizeMotion(Offset previous, Offset delta, double side) {
+    final radius = previous.distance;
+    final tangent = (previous.dx * delta.dy - previous.dy * delta.dx).abs();
+    if (radius >= side * .11 && tangent >= radius * delta.distance * .58) {
+      return _DialMotion.turn;
+    }
+    return delta.dy.abs() > delta.dx.abs() * 1.2 ? _DialMotion.slide : null;
   }
 
   void _adjust(double delta) {
-    _dragValue = (_dragValue + delta).clamp(0.0, 100.0);
-    _update(_dragValue.round());
+    final previous = _dragValue;
+    if (previous == null) return;
+    final next = (previous + delta).clamp(0.0, 100.0);
+    if (previous == next) return;
+    setState(() => _dragValue = next);
+    final rounded = next.round();
+    if (rounded != _lastDragVolume) {
+      _lastDragVolume = rounded;
+      widget.onChanged(rounded);
+    }
   }
 
-  void _update(int next) {
-    final value = next.clamp(0, 100);
-    if (value != widget.value) widget.onChanged(value);
+  void _clearDrag() {
+    if (_dragValue != null) setState(() => _dragValue = null);
   }
 
-  void _tap(TapUpDetails details, double height) {
+  void _finishDrag(DragEndDetails _) {
+    _clearDrag();
+    widget.onInteractionEnd?.call();
+  }
+
+  void _tap(TapUpDetails details, double side) {
     widget.onInteractionStart?.call();
-    final offset = details.localPosition.dy - height / 2;
-    if (offset.abs() < 9) return;
-    _update(widget.value + (offset < 0 ? 1 : -1));
+    final point = details.localPosition;
+    final offset = point.dy - side / 2;
+    if (point.dx < side * .62 || offset.abs() < side * .25) return;
+    final value = (widget.value + (offset < 0 ? 1 : -1)).clamp(0, 100);
+    if (value != widget.value) widget.onChanged(value);
     widget.onInteractionEnd?.call();
   }
 
   @override
   Widget build(BuildContext context) {
+    final visibleVolume = _dragValue ?? widget.value.toDouble();
     return LayoutBuilder(
       builder: (context, bounds) {
         final side = math.min(
@@ -398,12 +426,11 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
                       (recognizer) {
                         recognizer
                           ..gestureSettings = _dragSettings
-                          ..dragStartBehavior = DragStartBehavior.down;
-                        recognizer.onStart = (details) =>
-                            _startDrag(details, side);
+                          ..dragStartBehavior = DragStartBehavior.down
+                          ..onStart = _startDrag
+                          ..onEnd = _finishDrag
+                          ..onCancel = _clearDrag;
                         recognizer.onUpdate = (details) => _drag(details, side);
-                        recognizer.onEnd = (_) =>
-                            widget.onInteractionEnd?.call();
                       },
                     ),
               },
@@ -412,15 +439,13 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
               dimension: side,
               child: CustomPaint(
                 painter: _VolumeDialPainter(
-                  value: widget.value,
+                  value: visibleVolume,
                   enabled: widget.enabled,
                   style: widget.style,
                 ),
-                foregroundPainter: _VolumeDialGuidePainter(
-                  value: widget.value,
-                  target: widget.guide,
-                  status: widget.statusColor,
-                ),
+                foregroundPainter: widget.guide == null
+                    ? null
+                    : _VolumeDialGuidePainter(widget.guide!),
               ),
             ),
           ),
@@ -437,7 +462,7 @@ class _VolumeDialPainter extends CustomPainter {
     required this.style,
   });
 
-  final int value;
+  final double value;
   final bool enabled;
   final VolumeDialStyle style;
 
@@ -728,141 +753,20 @@ class _SignalMark extends CustomPainter {
   bool shouldRepaint(covariant _SignalMark oldDelegate) => false;
 }
 
-class BeatStrip extends StatelessWidget {
-  const BeatStrip({
-    super.key,
-    required this.remaining,
-    this.total = 4,
-    this.label,
-    this.combo = 0,
-    this.holdingCombo = false,
-    this.beatPhase,
-    this.signalReady = false,
-  }) : assert(total > 0 && remaining >= 0 && remaining <= total);
-
-  final int remaining;
-  final int total;
-  final String? label;
-  final int combo;
-  final bool holdingCombo;
-  final double? beatPhase;
-  final bool signalReady;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = label ?? '남은 박 $remaining';
-    final comboText = _comboLabel(combo, holdingCombo);
-    return Semantics(
-      label: combo == 0 ? text : '$text, $comboText',
-      excludeSemantics: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: double.infinity,
-            child: Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 6,
-              runSpacing: 2,
-              children: [
-                Text(text, style: const TextStyle(color: _ink)),
-                _ComboBadge(count: combo, holding: holdingCombo),
-              ],
-            ),
-          ),
-          const SizedBox(height: 6),
-          SizedBox(
-            width: double.infinity,
-            height: 30,
-            child: CustomPaint(
-              painter: _RhythmTrack(
-                phase: beatPhase,
-                signalReady: signalReady,
-                reducedMotion: MediaQuery.disableAnimationsOf(context),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RhythmTrack extends CustomPainter {
-  const _RhythmTrack({
-    required this.phase,
-    required this.signalReady,
-    required this.reducedMotion,
-  });
-
-  final double? phase;
-  final bool signalReady;
-  final bool reducedMotion;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bounds = Offset.zero & size;
-    final lane = RRect.fromRectAndRadius(bounds, const Radius.circular(7));
-    canvas.drawRRect(lane, Paint()..color = const Color(0xFF24203A));
-    canvas.save();
-    canvas.clipRRect(lane);
-    final targetX = size.width * .82;
-    final centerY = size.height / 2;
-    final paint = Paint()..color = _line;
-    canvas.drawLine(Offset(8, centerY), Offset(size.width - 8, centerY), paint);
-    final beat = phase;
-    final accent = signalReady ? _amber : _mint;
-    if (beat != null) {
-      final spacing = size.width * .19;
-      final progress = reducedMotion ? 0.0 : beat;
-      for (var index = 0; index <= 4; index++) {
-        final x = targetX + (progress - index) * spacing;
-        final emphasis = index == 0 && (reducedMotion || beat == 0);
-        final side = emphasis ? 6.0 : 4.0;
-        final note = Path()
-          ..moveTo(x, centerY - side)
-          ..lineTo(x + side, centerY)
-          ..lineTo(x, centerY + side)
-          ..lineTo(x - side, centerY)
-          ..close();
-        canvas.drawPath(
-          note,
-          paint..color = accent.withAlpha(emphasis ? 255 : 160),
-        );
-      }
-    }
-    canvas.drawLine(
-      Offset(targetX, 3),
-      Offset(targetX, size.height - 3),
-      paint
-        ..strokeWidth = 2
-        ..color = beat == null ? _muted : accent,
-    );
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _RhythmTrack oldDelegate) =>
-      oldDelegate.phase != phase ||
-      oldDelegate.signalReady != signalReady ||
-      oldDelegate.reducedMotion != reducedMotion;
-}
-
 String _comboLabel(int count, bool holding) =>
     '$count 콤보${holding ? ' 유지' : ''}';
 
-class _ComboBadge extends StatefulWidget {
-  const _ComboBadge({required this.count, required this.holding});
+class ComboBadge extends StatefulWidget {
+  const ComboBadge({super.key, required this.count, required this.holding});
 
   final int count;
   final bool holding;
 
   @override
-  State<_ComboBadge> createState() => _ComboBadgeState();
+  State<ComboBadge> createState() => _ComboBadgeState();
 }
 
-class _ComboBadgeState extends State<_ComboBadge>
+class _ComboBadgeState extends State<ComboBadge>
     with SingleTickerProviderStateMixin {
   static final _punch = TweenSequence<double>([
     TweenSequenceItem(tween: Tween(begin: 0, end: 1), weight: 25),
@@ -883,7 +787,7 @@ class _ComboBadgeState extends State<_ComboBadge>
   }
 
   @override
-  void didUpdateWidget(covariant _ComboBadge oldWidget) {
+  void didUpdateWidget(covariant ComboBadge oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.holding ||
         widget.count == 0 ||
@@ -1042,7 +946,6 @@ class ZoneControlCard extends StatelessWidget {
     required this.onVolumeChanged,
     required this.target,
     required this.cue,
-    required this.showTarget,
     required this.onInteractionStart,
     this.enabled = true,
     this.onInteractionEnd,
@@ -1057,7 +960,6 @@ class ZoneControlCard extends StatelessWidget {
   final ValueChanged<int> onVolumeChanged;
   final ({int minimum, int maximum}) target;
   final MixCue cue;
-  final bool showTarget;
   final VoidCallback onInteractionStart;
   final bool enabled;
   final VoidCallback? onInteractionEnd;
@@ -1117,8 +1019,6 @@ class ZoneControlCard extends StatelessWidget {
                 target: target,
                 vertical: true,
                 dialStyle: dialStyle,
-                showDialTarget: showTarget,
-                dialStatus: status.color,
                 enabled: enabled,
                 onInteractionStart: onInteractionStart,
                 onInteractionEnd: onInteractionEnd,
@@ -1139,49 +1039,35 @@ class ZoneControlCard extends StatelessWidget {
 }
 
 class _VolumeDialGuidePainter extends CustomPainter {
-  const _VolumeDialGuidePainter({
-    required this.value,
-    required this.target,
-    required this.status,
-  });
+  const _VolumeDialGuidePainter(this.target);
 
-  final int value;
-  final ({int minimum, int maximum})? target;
-  final Color status;
+  final ({int minimum, int maximum}) target;
 
   @override
   void paint(Canvas canvas, Size size) {
     final origin = Offset(size.width / 2, size.height / 2);
     final radius = _dialRadius(size);
     if (radius <= 12) return;
-    final band = target;
-    if (band == null) {
-      canvas.drawCircle(
-        origin.translate(0, -radius - 8),
-        2.5,
-        Paint()..color = status,
+    final paint = Paint()
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round
+      ..color = _mint;
+    for (
+      var mark = (target.minimum + 1) ~/ 2 * 2;
+      mark <= target.maximum;
+      mark += 2
+    ) {
+      final angle = _dialStart + _dialSweep * mark / 100;
+      final direction = Offset(math.cos(angle), math.sin(angle));
+      canvas.drawLine(
+        origin + direction * (radius + 3),
+        origin + direction * (radius + 8),
+        paint,
       );
-      return;
     }
-    canvas.drawArc(
-      Rect.fromCircle(center: origin, radius: radius),
-      _dialStart + _dialSweep * band.minimum / 100,
-      _dialSweep * (band.maximum - band.minimum) / 100,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4
-        ..color = _mint,
-    );
-    final angle = _dialStart + _dialSweep * value / 100;
-    final pointer = origin + Offset(math.cos(angle), math.sin(angle)) * radius;
-    canvas.drawCircle(pointer, 2.3, Paint()..color = _ink);
   }
 
   @override
   bool shouldRepaint(covariant _VolumeDialGuidePainter oldDelegate) =>
-      target != oldDelegate.target ||
-      (target == null
-          ? status != oldDelegate.status
-          : value != oldDelegate.value);
+      target != oldDelegate.target;
 }

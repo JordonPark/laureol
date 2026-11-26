@@ -80,6 +80,9 @@ void main() {
     expect(find.text('동네 축제 공연'), findsOneWidget);
     expect(tester.widget<ZoneVolumeSlider>(rear.last).value, 50);
     expect(rear, findsNWidgets(2));
+    expect(find.text('시작'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    expect(scene().tick, 160);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(LaureolApp(records: firstRun));
@@ -165,6 +168,8 @@ void main() {
     );
     final frontBefore = dial(sliders.first);
     final rearBefore = dial(sliders.last);
+    expect(frontBefore.foregroundPainter, isNotNull);
+    expect(rearBefore.foregroundPainter, isNotNull);
     final frontBounds = tester.getRect(_dialGesture(sliders.first));
     expect(tester.widget<ZoneVolumeSlider>(sliders.first).target, (
       minimum: 48,
@@ -181,7 +186,7 @@ void main() {
     expect(
       dial(sliders.first).foregroundPainter!
           .shouldRepaint(frontBefore.foregroundPainter!),
-      isFalse,
+      isTrue,
     );
 
     await tester.drag(_dialGesture(sliders.last), const Offset(0, 180));
@@ -216,9 +221,56 @@ void main() {
     expect(tester.widget<ZoneVolumeSlider>(sliders.first).value, 50);
     expect(
       dial(sliders.first).foregroundPainter!.shouldRepaint(inactive),
-      isTrue,
+      isFalse,
     );
   });
+
+  testWidgets(
+    'A small turn responds from the cap and can reverse immediately',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 740));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(LaureolApp(records: records));
+      await tester.tap(find.text('공연 시작'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('동네 축제 시작'));
+      await tester.pumpAndSettle();
+
+      final front = find.byType(ZoneVolumeSlider).first;
+      final bounds = tester.getRect(_dialGesture(front));
+      Offset path(double degrees) {
+        final angle = degrees * math.pi / 180;
+        return bounds.center +
+            Offset(math.cos(angle), math.sin(angle)) * (bounds.width * .17);
+      }
+
+      int volume() => tester.widget<ZoneVolumeSlider>(front).value;
+
+      await tester.tapAt(bounds.topCenter + const Offset(0, 10));
+      await tester.pump();
+      expect(volume(), 50);
+
+      final turn = await tester.startGesture(path(-90));
+      await turn.moveTo(path(-72));
+      await tester.pump();
+      expect(volume(), greaterThan(50));
+      final adjusted = volume();
+      await turn.up();
+      await tester.pump();
+
+      final reverse = await tester.startGesture(path(-90));
+      await reverse.moveTo(path(-72));
+      await reverse.moveTo(path(-90));
+      await reverse.up();
+      await tester.pump();
+      expect(volume(), adjusted);
+
+      final rear = find.byType(ZoneVolumeSlider).last;
+      await tester.drag(_dialGesture(rear), const Offset(0, -6));
+      await tester.pump();
+      expect(tester.widget<ZoneVolumeSlider>(rear).value, 42);
+    },
+  );
 
   testWidgets('Combo reconnect animates in place and respects reduced motion', (
     tester,
@@ -230,12 +282,9 @@ void main() {
           textDirection: TextDirection.ltr,
           child: Center(
             child: SizedBox(
+              key: const ValueKey('combo test frame'),
               width: 300,
-              child: BeatStrip(
-                remaining: 4,
-                combo: combo,
-                holdingCombo: holding,
-              ),
+              child: ComboBadge(count: combo, holding: holding),
             ),
           ),
         ),
@@ -245,7 +294,8 @@ void main() {
     double scale() =>
         tester.widget<Transform>(find.byType(Transform)).transform[0];
     await tester.pumpWidget(strip(18, holding: true));
-    final originalBounds = tester.getRect(find.byType(BeatStrip));
+    final frame = find.byKey(const ValueKey('combo test frame'));
+    final originalBounds = tester.getRect(frame);
     expect(find.text('18 콤보 유지'), findsOneWidget);
     expect(scale(), 1);
 
@@ -253,7 +303,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 90));
     expect(find.text('19 콤보'), findsOneWidget);
     expect(scale(), greaterThan(1.2));
-    expect(tester.getRect(find.byType(BeatStrip)), originalBounds);
+    expect(tester.getRect(frame), originalBounds);
     await tester.pumpAndSettle();
     expect(scale(), 1);
 
@@ -300,7 +350,7 @@ void main() {
       final safeBounds = padding.deflateRect(Offset.zero & size);
       final cards = find.byType(ZoneControlCard);
       expect(cards, findsNWidgets(2));
-      expect(find.textContaining('뒷줄 볼륨을 올려 ✓ 준비에 맞춰요'), findsOneWidget);
+      expect(find.text('두 노브를 민트색 눈금에 맞춰요'), findsOneWidget);
       for (final target in [
         find.byType(FestivalScene),
         cards.first,
@@ -346,23 +396,31 @@ void main() {
         tester.widget<FestivalScene>(find.byType(FestivalScene)).focusedVolume,
         54,
       );
-      await tester.tapAt(Offset(backBounds.center.dx, backBounds.top + 8));
+      await tester.tapAt(Offset(backBounds.right - 8, backBounds.top + 8));
       await tester.pump();
       final focused = tester.widget<FestivalScene>(find.byType(FestivalScene));
       expect(focused.focusedZone, FestivalZone.back);
       expect(focused.focusedVolume, 55);
       expect(tester.widget<ZoneControlCard>(cards.last).selected, isTrue);
+      await tester.tap(find.text('시작'));
+      await tester.pump();
 
       final stage = tester.widget<FestivalScene>(find.byType(FestivalScene));
       await tester.pump(festivalTick * (272 - stage.tick));
-      expect(find.text('후렴 2 신호까지 16박'), findsOneWidget);
+      expect(
+        tester.widget<SignalButton>(find.byType(SignalButton)).onPressed,
+        isNull,
+      );
       expect(find.byType(ZoneVolumeSlider).hitTestable(), findsNWidgets(2));
       await tester.pump(const Duration(seconds: 4));
       expect(
         tester.widget<FestivalScene>(find.byType(FestivalScene)).tick,
         368,
       );
-      expect(find.text('후렴 2 신호까지 8박'), findsOneWidget);
+      expect(
+        tester.widget<SignalButton>(find.byType(SignalButton)).onPressed,
+        isNull,
+      );
 
       final closingTick = tester
           .widget<FestivalScene>(find.byType(FestivalScene))
@@ -450,8 +508,6 @@ void main() {
       expect(front.top, back.top);
       expect(front.size, back.size);
       expect(front.width, front.height);
-      final notes = tester.getRect(find.byType(BeatStrip));
-      expect(notes.bottom, lessThan(front.top));
       expect(
         back.bottom,
         lessThan(tester.getRect(find.byType(SignalButton)).top),
@@ -462,7 +518,10 @@ void main() {
 
     final cardBounds = checkControlsInView();
     expect(scene().compact, isTrue);
-    await tester.pump(Duration(milliseconds: (176 - scene().tick) * 125));
+    expect(find.text('준비'), findsOneWidget);
+    expect(find.text('시작'), findsNothing);
+    await tester.pump(const Duration(seconds: 8));
+    expect(scene().tick, 160);
     final rearSlider = find.byType(ZoneVolumeSlider).last;
     final track = _dialGesture(rearSlider);
     expect(tester.getSize(track).height, greaterThanOrEqualTo(48));
@@ -470,9 +529,26 @@ void main() {
     await tester.drag(track, const Offset(0, -30));
     await tester.pump();
     expect(find.text('✓  준비'), findsNWidgets(2));
+    await tester.tap(find.text('시작'));
+    await tester.pump();
+    expect(
+      tester.widget<SignalButton>(find.byType(SignalButton)).onPressed,
+      isNull,
+    );
+    await tester.pump(festivalTick * (176 - scene().tick));
 
     final signal = find.text('라우럴!').first;
     expect(find.byType(SignalButton), findsOneWidget);
+    await tester.drag(track, const Offset(0, 150));
+    await tester.pump();
+    expect(scene().front, CrowdStatus.quiet);
+    expect(scene().back, CrowdStatus.quiet);
+    expect(
+      tester.widget<SignalButton>(find.byType(SignalButton)).onPressed,
+      isNotNull,
+    );
+    await tester.drag(track, const Offset(0, -150));
+    await tester.pump();
     expect(find.bySemanticsLabel('라우럴! 앞줄'), findsOneWidget);
     expect(scene().frontCue, MixCue.signal);
     expect(
@@ -483,7 +559,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('신호 예약'), findsOneWidget);
-    expect(find.text('남은 박 4'), findsOneWidget);
+    expect(find.textContaining('남은 박'), findsNothing);
     expect(checkControlsInView(), cardBounds);
 
     await tester.tap(find.bySemanticsLabel('일시정지'));
@@ -556,9 +632,11 @@ void main() {
         tester.pump(festivalTick * (tick - scene().tick));
     final rearTrack = _dialGesture(find.byType(ZoneVolumeSlider).last);
     const missedTick = 248;
-    await advanceTo(176);
     await tester.drag(rearTrack, const Offset(0, -30));
     await tester.pump();
+    await tester.tap(find.text('시작'));
+    await tester.pump();
+    await advanceTo(176);
     await tester.tap(find.text('라우럴!').first);
     await advanceTo(240);
     expect(find.text('10 콤보!'), findsOneWidget);

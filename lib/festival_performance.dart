@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'performance_controls.dart';
 
 const festivalTick = Duration(milliseconds: 125);
@@ -11,6 +13,7 @@ const _readyMaximum = 68;
 const _generatorStopTick = 79 * _ticksPerSecond + _ticksPerBeat;
 const _rescueBeats = 2;
 const _rewindTicks = 3 * _ticksPerSecond;
+const _maxEarlySignalBeats = 3;
 const comboEffectTicks = 12;
 
 enum FestivalZone { front, back }
@@ -59,6 +62,7 @@ class ComboBreak {
     this.combo,
     this._mask,
     this._mix,
+    this._signalEarlierBeats,
   );
 
   final int chorus;
@@ -67,6 +71,7 @@ class ComboBreak {
   final int combo;
   final int _mask;
   final _MixSnapshot _mix;
+  final int _signalEarlierBeats;
 
   int get rewindTick => _mix.tick;
   String get zoneLabel => _missingLabel(_mask);
@@ -78,6 +83,7 @@ class ChorusCheckpoint {
     this.tick,
     List<int> volumes,
     List<CrowdStatus> levels,
+    this._signalEarlierBeats,
   ) : _volumes = List.unmodifiable(volumes),
       _levels = List.unmodifiable(levels);
 
@@ -85,36 +91,43 @@ class ChorusCheckpoint {
   final int tick;
   final List<int> _volumes;
   final List<CrowdStatus> _levels;
+  final int _signalEarlierBeats;
 
   List<int> toRecord() => [
     chorus,
     tick,
     ..._volumes,
     ..._levels.map((level) => level.index),
+    _signalEarlierBeats,
   ];
 
   static ChorusCheckpoint? fromRecord(Object? value) {
     if (value is! List ||
-        value.length != 6 ||
+        (value.length != 6 && value.length != 7) ||
         value.any((item) => item is! int)) {
       return null;
     }
     final values = value.cast<int>();
     final chorus = values[0];
+    final earlier = values.length == 7 ? values[6] : 0;
     if (chorus < 1 ||
         chorus > _choruses.length ||
         values[1] != _choruses[chorus - 1].preview * _ticksPerSecond ||
         values.skip(2).take(2).any((volume) => volume < 0 || volume > 100) ||
         values
             .skip(4)
-            .any((level) => level < 0 || level >= CrowdStatus.singing.index)) {
+            .take(2)
+            .any((level) => level < 0 || level >= CrowdStatus.singing.index) ||
+        earlier < 0 ||
+        earlier > _maxEarlySignalBeats) {
       return null;
     }
     return ChorusCheckpoint._(
       chorus,
       values[1],
       values.sublist(2, 4),
-      values.skip(4).map((level) => CrowdStatus.values[level]).toList(),
+      values.sublist(4, 6).map((level) => CrowdStatus.values[level]).toList(),
+      earlier,
     );
   }
 }
@@ -157,6 +170,13 @@ const _choruses = [
   _Chorus(3, 74, 78, 81, 80),
 ];
 
+List<int> _signalOffsets(math.Random? random) {
+  if (random == null) return List.filled(_choruses.length, 0);
+  final offsets = List.generate(_maxEarlySignalBeats + 1, (i) => i)
+    ..shuffle(random);
+  return offsets.sublist(0, _choruses.length);
+}
+
 /// Deterministic 120 BPM festival simulation shared by audio-free UI states.
 class FestivalPerformance {
   FestivalPerformance({
@@ -165,9 +185,11 @@ class FestivalPerformance {
     this.preserveRehearsalMix = false,
     this.venue = FestivalVenue.neighborhood,
     this.recovery,
+    math.Random? signalTiming,
   }) : assert(
          practiceChorus == null || (practiceChorus >= 1 && practiceChorus <= 3),
        ),
+       _signalEarlierBeats = _signalOffsets(signalTiming),
        _tick = practiceChorus == null
            ? 0
            : _choruses[practiceChorus - 1].preview * _ticksPerSecond {
@@ -193,6 +215,8 @@ class FestivalPerformance {
     performance._tick = checkpoint.tick;
     performance._volumes.setAll(0, checkpoint._volumes);
     performance._levels.setAll(0, checkpoint._levels);
+    performance._signalEarlierBeats[checkpoint.chorus - 1] =
+        checkpoint._signalEarlierBeats;
     performance._checkpoints[checkpoint.chorus - 1] = checkpoint;
     return performance;
   }
@@ -220,6 +244,8 @@ class FestivalPerformance {
     performance._bestCombo = mix.combo;
     performance._joinedTogetherThisChorus = mix.joinedTogether;
     performance._rescueUsed = mix.rescueUsed;
+    performance._signalEarlierBeats[moment.chorus - 1] =
+        moment._signalEarlierBeats;
     return performance;
   }
 
@@ -232,6 +258,7 @@ class FestivalPerformance {
       _generatorStopTick +
       (mastery || venue == FestivalVenue.nightMarket ? 2 * _ticksPerBeat : 0);
   int _tick;
+  final List<int> _signalEarlierBeats;
   final _volumes = [50, 40];
   final _levels = [CrowdStatus.quiet, CrowdStatus.quiet];
   final _singing = [false, false];
@@ -334,9 +361,16 @@ class FestivalPerformance {
   }
 
   void startMainConcert() {
-    if (practiceChorus != null || concertStarted) return;
-    advanceTicks(_choruses.first.preview * _ticksPerSecond - _tick);
+    if (practiceChorus != null) return;
+    if (ticksUntilMainConcert > 0) {
+      advanceTicks(ticksUntilMainConcert);
+    } else if (ticksUntilMainConcert == 0) {
+      _saveCheckpoint(1);
+    }
   }
+
+  int get ticksUntilMainConcert =>
+      _choruses.first.preview * _ticksPerSecond - _tick;
 
   int? get waveFrame {
     final from = _waveTick;
@@ -358,8 +392,14 @@ class FestivalPerformance {
     return null;
   }
 
+  int _signalOpensAt(_Chorus chorus) =>
+      chorus.opens * _ticksPerSecond -
+      (chorus.number == 0
+          ? 0
+          : _signalEarlierBeats[chorus.number - 1] * _ticksPerBeat);
+
   bool _isOpen(_Chorus chorus) =>
-      _tick >= chorus.opens * _ticksPerSecond &&
+      _tick >= _signalOpensAt(chorus) &&
       _tick < chorus.closes * _ticksPerSecond;
 
   ({_Chorus previous, _Chorus next})? get _interlude {
@@ -367,7 +407,7 @@ class FestivalPerformance {
     for (var index = 1; index < _choruses.length; index++) {
       final previous = _choruses[index - 1];
       final next = _choruses[index];
-      if (seconds >= previous.end && seconds < next.opens) {
+      if (seconds >= previous.end && _tick < _signalOpensAt(next)) {
         return (previous: previous, next: next);
       }
     }
@@ -379,7 +419,7 @@ class FestivalPerformance {
     if (interlude == null) return null;
     final cut = interlude.previous.end * _ticksPerSecond + _interludeLength;
     final preview = interlude.next.preview * _ticksPerSecond;
-    final target = interlude.next.opens * _ticksPerSecond;
+    final target = _signalOpensAt(interlude.next);
     final skipped = preview - _tick.clamp(cut, preview);
     return (
       chorus: interlude.next.number,
@@ -458,7 +498,9 @@ class FestivalPerformance {
     }
     if (seconds >= 48 && seconds < 50) return ('앞줄 체감 볼륨 증가', null);
     final chorus = _chorusAt(_tick);
-    if (chorus != null && chorus.number == 1 && seconds < chorus.opens) {
+    if (chorus != null &&
+        chorus.number == 1 &&
+        _tick < _signalOpensAt(chorus)) {
       final instruction = switch (_levels[FestivalZone.front.index]) {
         CrowdStatus.quiet => '앞줄 볼륨을 올려 ✓ 준비에 맞춰요',
         CrowdStatus.loud => '앞줄 볼륨을 내려 ✓ 준비에 맞춰요',
@@ -547,11 +589,14 @@ class FestivalPerformance {
   SignalState get sharedSignal =>
       signal(_reserved ?? recommendedSignalZone ?? FestivalZone.front);
 
+  bool get bothRowsReady =>
+      _levels.every((level) => level == CrowdStatus.ready);
+
   bool startsBothRows(FestivalZone zone) =>
       zone == FestivalZone.back &&
       _chorusAt(_tick)?.number == 3 &&
       _tick >= _generatorEnd &&
-      _levels.every((level) => level == CrowdStatus.ready);
+      bothRowsReady;
 
   double get beatPhase => (_tick % _ticksPerBeat) / _ticksPerBeat;
   bool get hasLiveRhythm => !finished && seconds < _choruses.last.end;
@@ -659,6 +704,7 @@ class FestivalPerformance {
       _tick,
       _volumes,
       _levels,
+      _signalEarlierBeats[chorus - 1],
     );
   }
 
@@ -715,6 +761,7 @@ class FestivalPerformance {
         _combo,
         missing,
         mix,
+        _signalEarlierBeats[chorus.number - 1],
       );
     }
     final end = chorus.end * _ticksPerSecond;

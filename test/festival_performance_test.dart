@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laureol/festival_performance.dart';
 import 'package:laureol/performance_controls.dart';
@@ -7,6 +9,54 @@ void _at(FestivalPerformance performance, double seconds) {
 }
 
 void main() {
+  test('Signal openings vary and survive a saved chorus replay', () {
+    final performance = FestivalPerformance(signalTiming: math.Random(19));
+    const front = FestivalZone.front;
+    const back = FestivalZone.back;
+    final advances = <int>{};
+    performance.startMainConcert();
+    performance.setVolume(back, 53);
+    performance.startMainConcert();
+    for (final (chorus, preview, regularOpening, close) in [
+      (1, 20.0, 22.0, 24.0),
+      (2, 46.0, 50.0, 52.0),
+      (3, 74.0, 78.0, 81.0),
+    ]) {
+      _at(performance, preview);
+      final saved = performance.chorusResult(chorus).checkpoint.toRecord();
+      final restored = FestivalPerformance.replay(
+        ChorusCheckpoint.fromRecord(saved)!,
+      );
+      if (chorus == 1) expect(restored.volume(back), 53);
+
+      while (performance.signal(front) == SignalState.waiting &&
+          performance.tick < (regularOpening * 8).round()) {
+        performance.advanceTicks(1);
+      }
+      final openingTick = performance.tick;
+      expect(performance.signal(front), SignalState.available);
+      final earlier = (regularOpening * 8).round() - openingTick;
+      expect(earlier, inInclusiveRange(0, 12));
+      advances.add(earlier);
+
+      restored.advanceTicks(openingTick - restored.tick - 1);
+      expect(restored.signal(front), SignalState.waiting);
+      restored.advanceTicks(1);
+      expect(restored.signal(front), SignalState.available);
+      _at(restored, close);
+      expect(restored.signal(front), SignalState.waiting);
+
+      final legacy = FestivalPerformance.replay(
+        ChorusCheckpoint.fromRecord(saved.take(6).toList())!,
+      );
+      _at(legacy, regularOpening - .125);
+      expect(legacy.signal(front), SignalState.waiting);
+      legacy.advanceTicks(1);
+      expect(legacy.signal(front), SignalState.available);
+    }
+    expect(advances, hasLength(3));
+  });
+
   test('First chorus reserves once and scores each occupied half-second', () {
     final performance = FestivalPerformance();
     const front = FestivalZone.front;
