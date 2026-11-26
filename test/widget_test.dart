@@ -61,7 +61,7 @@ void main() {
       await tester.pump(festivalTick * (736 - scene().tick));
       await tester.pumpAndSettle();
 
-      final nextShow = find.text('다음 무대 · 옥상 공연');
+      final nextShow = find.bySemanticsLabel('다음 무대 · 옥상 공연');
       await tester.ensureVisible(nextShow);
       await tester.tap(nextShow);
       await tester.pumpAndSettle();
@@ -468,6 +468,16 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('전체 결과'), findsOneWidget);
       expect(find.text('결과 보기'), findsNothing);
+      final nextShow = find.bySemanticsLabel('다음 무대 · 야외 야시장');
+      expect(nextShow.hitTestable(), findsOneWidget);
+      final footerBounds = tester.getRect(nextShow);
+      final chorus = find.text('후렴 1');
+      await tester.ensureVisible(chorus);
+      await tester.tap(chorus);
+      await tester.pumpAndSettle();
+      expect(find.text('후렴 1 연습'), findsOneWidget);
+      expect(nextShow.hitTestable(), findsOneWidget);
+      expect(tester.getRect(nextShow), footerBounds);
       expect(records.concertBest, isNotNull);
       expect(tester.takeException(), isNull);
     }, variant: TargetPlatformVariant({TargetPlatform.iOS}));

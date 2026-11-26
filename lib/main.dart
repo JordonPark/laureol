@@ -99,6 +99,8 @@ class _Screen extends StatelessWidget {
     required this.children,
     this.trailing,
     this.middle,
+    this.footer,
+    this.previousPageTitle = '뒤로',
     this.compact = false,
     this.maxWidth = 520,
   });
@@ -107,6 +109,8 @@ class _Screen extends StatelessWidget {
   final List<Widget> children;
   final Widget? trailing;
   final Widget? middle;
+  final Widget? footer;
+  final String previousPageTitle;
   final bool compact;
   final double maxWidth;
 
@@ -131,7 +135,7 @@ class _Screen extends StatelessWidget {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: middle ?? Text(title, style: const TextStyle(color: _paper)),
-        previousPageTitle: '뒤로',
+        previousPageTitle: previousPageTitle,
         trailing: trailing,
       ),
       child: SafeArea(
@@ -139,7 +143,14 @@ class _Screen extends StatelessWidget {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
-            child: content,
+            child: footer == null
+                ? content
+                : Column(
+                    children: [
+                      Expanded(child: content),
+                      footer!,
+                    ],
+                  ),
           ),
         ),
       ),
@@ -1281,67 +1292,113 @@ class _ResultsScreen extends StatefulWidget {
 class _ResultsScreenState extends State<_ResultsScreen> {
   int? _expandedChorus;
 
+  void _play(FestivalVenue venue) {
+    _open(
+      context,
+      _PerformanceScreen(
+        records: widget.records,
+        returnHome: widget.returnHome,
+        venue: venue,
+      ),
+      replace: true,
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(builder: _build);
+
+  Widget _build(BuildContext context, BoxConstraints viewport) {
     final recommended = recommendedChorusPractice(widget.results);
     final lost = widget.comboBreak;
     final venue = widget.venue;
     final nextVenue = venue.next;
     final canContinue =
         nextVenue != null && widget.records.isUnlocked(nextVenue);
-    final compact = MediaQuery.sizeOf(context).height < 480;
-    return _Screen(
-      title: '전체 결과',
+    final safeWidth =
+        viewport.maxWidth - MediaQuery.paddingOf(context).horizontal;
+    final compact = viewport.maxHeight < 480;
+    final wide = compact && safeWidth >= 550;
+    final hero = _ResultsHero(
+      venue: venue,
+      score: widget.score,
+      combo: widget.bestCombo,
+      missionAchieved: widget.missionAchieved,
       compact: compact,
+    );
+    final details = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ResultsHero(
-          venue: venue,
-          score: widget.score,
-          combo: widget.bestCombo,
-          missionAchieved: widget.missionAchieved,
-          compact: compact,
-        ),
-        if (!widget.saved) const Text('최고 기록을 저장하지 못했어요.'),
-        if (canContinue)
-          _Action(
-            '다음 무대 · ${nextVenue.title}',
-            () => _open(
-              context,
-              _PerformanceScreen(
-                records: widget.records,
-                venue: nextVenue,
-                returnHome: widget.returnHome,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 0, 2, 9),
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              const Text(
+                '후렴별 기록',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
               ),
-              replace: true,
-            ),
-            primary: true,
-          ),
-        const Text(
-          '후렴별 기록',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-        ),
-        for (final result in widget.results)
-          _ChorusResultCard(
-            result: result,
-            recommended: identical(recommended, result),
-            expanded: _expandedChorus == result.chorus,
-            onToggle: () => setState(() {
-              _expandedChorus = _expandedChorus == result.chorus
-                  ? null
-                  : result.chorus;
-            }),
-            onPractice: () => _open(
-              context,
-              _PerformanceScreen(
-                records: widget.records,
-                checkpoint: result.checkpoint,
-                venue: venue,
-                previousScore: result.score,
-                previousResult: result,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(width: 8, height: 8, color: _mint),
+                  const SizedBox(width: 5),
+                  const Text(
+                    '두 줄 떼창',
+                    style: TextStyle(color: _muted, fontSize: 11),
+                  ),
+                ],
               ),
-            ),
+            ],
           ),
-        if (lost != null)
+        ),
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: const Color(0xFF211B34),
+            border: Border.all(color: const Color(0xFF3D334E)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final (index, result) in widget.results.indexed) ...[
+                if (index > 0)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: SizedBox(
+                      height: 1,
+                      child: ColoredBox(color: Color(0xFF393049)),
+                    ),
+                  ),
+                _ChorusResultRow(
+                  result: result,
+                  recommended: identical(recommended, result),
+                  expanded: _expandedChorus == result.chorus,
+                  onToggle: () => setState(() {
+                    _expandedChorus = _expandedChorus == result.chorus
+                        ? null
+                        : result.chorus;
+                  }),
+                  onPractice: () => _open(
+                    context,
+                    _PerformanceScreen(
+                      records: widget.records,
+                      checkpoint: result.checkpoint,
+                      venue: venue,
+                      previousScore: result.score,
+                      previousResult: result,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (lost != null) ...[
+          const SizedBox(height: 10),
           _Action(
             '끊기기 3초 전부터 연습',
             () => _open(
@@ -1353,29 +1410,158 @@ class _ResultsScreenState extends State<_ResultsScreen> {
               ),
             ),
           ),
-        if (lost != null)
-          Text(
-            '${lost.combo}콤보 끊김 · 후렴 ${lost.chorus} ${lost.beat}박 · ${lost.zoneLabel}',
-            style: const TextStyle(color: _muted, fontSize: 13),
-          ),
-        _Action(
-          '공연 다시 하기',
-          () => _open(
-            context,
-            _PerformanceScreen(
-              records: widget.records,
-              returnHome: widget.returnHome,
-              venue: venue,
+          Padding(
+            padding: const EdgeInsets.only(top: 5, left: 2, right: 2),
+            child: Text(
+              '${lost.combo}콤보 끊김 · 후렴 ${lost.chorus} ${lost.beat}박 · ${lost.zoneLabel}',
+              style: const TextStyle(color: _muted, fontSize: 13),
             ),
-            replace: true,
           ),
-          primary: !canContinue,
-        ),
-        _Action(
-          widget.returnHome ? '시작 화면으로' : '공연 선택으로',
-          () => Navigator.of(context).pop(),
-        ),
+        ],
       ],
+    );
+    return _Screen(
+      title: '전체 결과',
+      previousPageTitle: widget.returnHome ? '시작 화면' : '공연 선택',
+      compact: compact,
+      maxWidth: wide ? 880 : 520,
+      footer: _ResultActions(
+        nextVenue: canContinue ? nextVenue : null,
+        onNext: canContinue ? () => _play(nextVenue) : null,
+        onReplay: () => _play(venue),
+        compact: compact,
+      ),
+      children: [
+        if (wide)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: hero),
+              const SizedBox(width: 14),
+              Expanded(child: details),
+            ],
+          )
+        else ...[
+          hero,
+          details,
+        ],
+        if (!widget.saved)
+          const Text('최고 기록을 저장하지 못했어요.', style: TextStyle(color: _muted)),
+      ],
+    );
+  }
+}
+
+class _ResultActions extends StatelessWidget {
+  const _ResultActions({
+    required this.nextVenue,
+    required this.onNext,
+    required this.onReplay,
+    required this.compact,
+  });
+
+  final FestivalVenue? nextVenue;
+  final VoidCallback? onNext;
+  final VoidCallback onReplay;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final next = nextVenue;
+    final primary = CupertinoButton(
+      color: _gold,
+      foregroundColor: _night,
+      borderRadius: BorderRadius.circular(10),
+      minimumSize: const Size(48, 48),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: compact ? 7 : 9),
+      onPressed: next == null ? onReplay : onNext,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (next == null)
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Icon(CupertinoIcons.arrow_clockwise, size: 18),
+            ),
+          Flexible(
+            child: next == null
+                ? const Text(
+                    '공연 다시 하기',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  )
+                : Semantics(
+                    label: '다음 무대 · ${next.title}',
+                    excludeSemantics: true,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '다음 무대',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          next.title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+          if (next != null) ...[
+            const SizedBox(width: 9),
+            const Icon(CupertinoIcons.arrow_right, size: 18),
+          ],
+        ],
+      ),
+    );
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: _night,
+        border: Border(top: BorderSide(color: Color(0xFF3D334E))),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          compact ? 12 : 16,
+          8,
+          compact ? 12 : 16,
+          8,
+        ),
+        child: Row(
+          children: [
+            if (next != null) ...[
+              CupertinoButton(
+                color: const Color(0xFF302746),
+                foregroundColor: _paper,
+                minimumSize: const Size(48, 48),
+                borderRadius: BorderRadius.circular(10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                onPressed: onReplay,
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.arrow_clockwise, size: 17),
+                    SizedBox(height: 2),
+                    Text('다시 하기', style: TextStyle(fontSize: 11)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Expanded(child: primary),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1397,88 +1583,189 @@ class _ResultsHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              venue.posterAsset,
-              fit: BoxFit.cover,
-              alignment: const Alignment(0, .18),
-              excludeFromSemantics: true,
+    final scores = Row(
+      children: [
+        Expanded(
+          flex: 3,
+          child: Semantics(
+            label: '공연 점수 $score점, 90점 만점',
+            excludeSemantics: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '공연 점수',
+                  style: TextStyle(color: _muted, fontSize: 12),
+                ),
+                const SizedBox(height: 3),
+                Text.rich(
+                  TextSpan(
+                    text: '$score',
+                    style: TextStyle(
+                      color: _gold,
+                      fontSize: compact ? 42 : 52,
+                      height: 1,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: ' / 90',
+                        style: TextStyle(
+                          color: _muted,
+                          fontSize: compact ? 14 : 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                  colors: [Color(0x70171329), Color(0xEC171329), _night],
-                  stops: [0, .59, 1],
+        ),
+        const SizedBox(
+          width: 1,
+          height: 48,
+          child: ColoredBox(color: Color(0xFF51405A)),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          flex: 2,
+          child: Semantics(
+            label: '최고 $combo콤보',
+            excludeSemantics: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '최고 콤보',
+                  style: TextStyle(color: _muted, fontSize: 12),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '$combo',
+                  style: TextStyle(
+                    color: _mint,
+                    fontSize: compact ? 34 : 40,
+                    height: 1,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: const Color(0xFF211B34),
+        border: Border.all(color: const Color(0xFF504050)),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LayoutBuilder(
+            builder: (context, bounds) => SizedBox(
+              height: compact
+                  ? 98
+                  : (bounds.maxWidth * .42).clamp(108, 185).toDouble(),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    venue.posterAsset,
+                    fit: BoxFit.cover,
+                    alignment: const Alignment(0, .12),
+                    excludeFromSemantics: true,
+                  ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x00171329),
+                          Color(0x00171329),
+                          Color(0xE5171329),
+                        ],
+                        stops: [0, .45, 1],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 10,
+                    left: 14,
+                    right: 14,
+                    child: Text(
+                      '${venue.title} 완료',
+                      style: const TextStyle(
+                        color: _paper,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(
+            height: 1,
+            child: ColoredBox(color: Color(0xFF7C5E4E)),
+          ),
+          DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF322741), Color(0xFF231E35)],
+              ),
+            ),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                14,
+                compact ? 8 : 12,
+                14,
+                compact ? 8 : 12,
+              ),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 270),
+                curve: Curves.easeOutCubic,
+                child: scores,
+                builder: (context, progress, child) => Opacity(
+                  opacity: .65 + .35 * progress,
+                  child: Transform.translate(
+                    offset: Offset(0, 5 * (1 - progress)),
+                    child: child,
+                  ),
                 ),
               ),
             ),
           ),
           Padding(
-            padding: EdgeInsets.all(compact ? 14 : 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            child: Row(
               children: [
-                Text(
-                  '${venue.title} 완료',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                  ),
+                Icon(
+                  missionAchieved
+                      ? CupertinoIcons.checkmark_circle_fill
+                      : CupertinoIcons.flag,
+                  color: missionAchieved ? _mint : _muted,
+                  size: 15,
                 ),
-                SizedBox(height: compact ? 5 : 10),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.end,
-                  spacing: 14,
-                  runSpacing: 4,
-                  children: [
-                    Semantics(
-                      label: '공연 점수 $score점, 90점 만점',
-                      excludeSemantics: true,
-                      child: Text.rich(
-                        TextSpan(
-                          text: '$score',
-                          style: TextStyle(
-                            color: _gold,
-                            fontSize: compact ? 36 : 48,
-                            height: 1,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          children: [
-                            TextSpan(
-                              text: ' / 90',
-                              style: TextStyle(
-                                color: _paper,
-                                fontSize: compact ? 16 : 19,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    missionAchieved ? '목표 달성' : venue.mission,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: missionAchieved ? _mint : _muted,
+                      fontWeight: FontWeight.w700,
                     ),
-                    Text(
-                      '최고 $combo콤보',
-                      style: const TextStyle(
-                        color: _mint,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  missionAchieved ? '✓ 목표 달성' : venue.mission,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: missionAchieved ? _mint : _muted,
                   ),
                 ),
               ],
@@ -1490,8 +1777,8 @@ class _ResultsHero extends StatelessWidget {
   }
 }
 
-class _ChorusResultCard extends StatelessWidget {
-  const _ChorusResultCard({
+class _ChorusResultRow extends StatelessWidget {
+  const _ChorusResultRow({
     required this.result,
     required this.recommended,
     required this.expanded,
@@ -1507,78 +1794,129 @@ class _ChorusResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF24203A),
-        border: Border.all(
-          color: recommended
-              ? const Color(0x907A624C)
-              : const Color(0xFF403650),
-        ),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Semantics(
-            expanded: expanded,
+    final title = '후렴 ${result.chorus}';
+    final seconds = (result.togetherBeats / 2).toStringAsFixed(1);
+    final nameWidth = MediaQuery.textScalerOf(context).scale(45);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          button: true,
+          expanded: expanded,
+          label:
+              '$title, ${result.score}점, 두 줄 떼창 $seconds초${recommended ? ', 추천 연습' : ''}',
+          onTap: onToggle,
+          child: ExcludeSemantics(
             child: CupertinoButton(
               minimumSize: const Size(48, 48),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               foregroundColor: _paper,
               onPressed: onToggle,
               child: Row(
                 children: [
-                  Expanded(
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                  SizedBox(
+                    width: nameWidth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '후렴 ${result.chorus}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                          title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                         if (recommended)
                           const Text(
                             '추천 연습',
-                            style: TextStyle(color: _gold, fontSize: 12),
+                            style: TextStyle(color: _gold, fontSize: 10),
                           ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${result.score}/30',
-                    style: const TextStyle(color: _mint, fontSize: 15),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: CustomPaint(
+                      size: const Size.fromHeight(17),
+                      painter: _ChorusBeatPainter(result),
+                    ),
                   ),
-                  const SizedBox(width: 9),
+                  const SizedBox(width: 12),
+                  Text.rich(
+                    TextSpan(
+                      text: '${result.score}',
+                      style: const TextStyle(
+                        color: _paper,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: '/30',
+                          style: const TextStyle(color: _muted, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Icon(
                     expanded
                         ? CupertinoIcons.chevron_up
                         : CupertinoIcons.chevron_down,
                     color: _muted,
-                    size: 13,
+                    size: 12,
                   ),
                 ],
               ),
             ),
           ),
-          if (expanded) ...[
-            ChorusSummary(result: result),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: _Action(
-                '후렴 ${result.chorus} 연습',
-                onPractice,
-                primary: true,
-              ),
+        ),
+        if (expanded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ChorusSummary(result: result),
+                _Action('$title 연습', onPractice),
+              ],
             ),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
+}
+
+class _ChorusBeatPainter extends CustomPainter {
+  const _ChorusBeatPainter(this.result);
+
+  final ChorusResult result;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (result.beatCount == 0 || size.width < 32) return;
+    final paint = Paint();
+    final step = size.width / result.beatCount;
+    final barWidth = step * .67;
+    for (var beat = 0; beat < result.beatCount; beat++) {
+      final front = result.sangAt(FestivalZone.front, beat);
+      final back = result.sangAt(FestivalZone.back, beat);
+      final together = front && back;
+      final solo = front || back;
+      final height = together ? size.height : (solo ? size.height * .58 : 3.0);
+      paint.color = together
+          ? _mint
+          : (solo ? const Color(0xFFBC9ECE) : const Color(0xFF4A405F));
+      canvas.drawRect(
+        Rect.fromLTWH(beat * step, size.height - height, barWidth, height),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ChorusBeatPainter oldDelegate) =>
+      result != oldDelegate.result;
 }
 
 class _RecoveryResults extends StatelessWidget {
