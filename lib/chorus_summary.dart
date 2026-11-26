@@ -2,32 +2,6 @@ import 'package:flutter/widgets.dart';
 
 import 'festival_performance.dart';
 
-ChorusResult? recommendedChorusPractice(List<ChorusResult> results) {
-  ChorusResult? selected;
-  var bestPriority = 0;
-  var bestTieBreak = 0;
-  for (final result in results) {
-    final front = result.firstBeat(FestivalZone.front);
-    final back = result.firstBeat(FestivalZone.back);
-    final missing = front == null || back == null;
-    final priority = missing
-        ? 2
-        : front == back
-        ? 0
-        : 1;
-    if (priority == 0) continue;
-    final tieBreak = missing ? -result.score : (front - back).abs();
-    if (selected == null ||
-        priority > bestPriority ||
-        (priority == bestPriority && tieBreak > bestTieBreak)) {
-      selected = result;
-      bestPriority = priority;
-      bestTieBreak = tieBreak;
-    }
-  }
-  return selected;
-}
-
 class ChorusSummary extends StatelessWidget {
   const ChorusSummary({super.key, required this.result});
 

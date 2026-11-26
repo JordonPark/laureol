@@ -936,6 +936,9 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       volume: performance.volume(zone),
       selected: selected,
       needsRescue: performance.needsRescue(zone),
+      targetCountdown: _preparingConcert || rehearsal != null
+          ? null
+          : performance.mixTargetCountdown(zone),
       onInteractionStart: () => _selectZone(zone),
       onVolumeChanged: (value) => _changeVolume(zone, value),
       target: performance.readyVolumeRange(zone),
@@ -1152,7 +1155,12 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         : scene;
     final cue = EventNotice(
       message: notice.$1,
-      remainingBeats: notice.$2,
+      remainingBeats:
+          FestivalZone.values.any(
+            (zone) => performance.mixTargetCountdown(zone) != null,
+          )
+          ? null
+          : notice.$2,
       compact: compact,
     );
     final mixer = Center(
@@ -1308,7 +1316,6 @@ class _ResultsScreenState extends State<_ResultsScreen> {
   Widget build(BuildContext context) => LayoutBuilder(builder: _build);
 
   Widget _build(BuildContext context, BoxConstraints viewport) {
-    final recommended = recommendedChorusPractice(widget.results);
     final lost = widget.comboBreak;
     final venue = widget.venue;
     final nextVenue = venue.next;
@@ -1375,49 +1382,25 @@ class _ResultsScreenState extends State<_ResultsScreen> {
                   ),
                 _ChorusResultRow(
                   result: result,
-                  recommended: identical(recommended, result),
                   expanded: _expandedChorus == result.chorus,
                   onToggle: () => setState(() {
                     _expandedChorus = _expandedChorus == result.chorus
                         ? null
                         : result.chorus;
                   }),
-                  onPractice: () => _open(
-                    context,
-                    _PerformanceScreen(
-                      records: widget.records,
-                      checkpoint: result.checkpoint,
-                      venue: venue,
-                      previousScore: result.score,
-                      previousResult: result,
-                    ),
-                  ),
                 ),
               ],
             ],
           ),
         ),
-        if (lost != null) ...[
-          const SizedBox(height: 10),
-          _Action(
-            '끊기기 3초 전부터 연습',
-            () => _open(
-              context,
-              _PerformanceScreen(
-                records: widget.records,
-                venue: venue,
-                recovery: lost,
-              ),
-            ),
-          ),
+        if (lost != null)
           Padding(
-            padding: const EdgeInsets.only(top: 5, left: 2, right: 2),
+            padding: const EdgeInsets.only(top: 10, left: 2, right: 2),
             child: Text(
               '${lost.combo}콤보 끊김 · 후렴 ${lost.chorus} ${lost.beat}박 · ${lost.zoneLabel}',
               style: const TextStyle(color: _muted, fontSize: 13),
             ),
           ),
-        ],
       ],
     );
     return _Screen(
@@ -1780,17 +1763,13 @@ class _ResultsHero extends StatelessWidget {
 class _ChorusResultRow extends StatelessWidget {
   const _ChorusResultRow({
     required this.result,
-    required this.recommended,
     required this.expanded,
     required this.onToggle,
-    required this.onPractice,
   });
 
   final ChorusResult result;
-  final bool recommended;
   final bool expanded;
   final VoidCallback onToggle;
-  final VoidCallback onPractice;
 
   @override
   Widget build(BuildContext context) {
@@ -1803,8 +1782,7 @@ class _ChorusResultRow extends StatelessWidget {
         Semantics(
           button: true,
           expanded: expanded,
-          label:
-              '$title, ${result.score}점, 두 줄 떼창 $seconds초${recommended ? ', 추천 연습' : ''}',
+          label: '$title, ${result.score}점, 두 줄 떼창 $seconds초',
           onTap: onToggle,
           child: ExcludeSemantics(
             child: CupertinoButton(
@@ -1816,22 +1794,12 @@ class _ChorusResultRow extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: nameWidth,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        if (recommended)
-                          const Text(
-                            '추천 연습',
-                            style: TextStyle(color: _gold, fontSize: 10),
-                          ),
-                      ],
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1874,13 +1842,7 @@ class _ChorusResultRow extends StatelessWidget {
         if (expanded)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ChorusSummary(result: result),
-                _Action('$title 연습', onPractice),
-              ],
-            ),
+            child: ChorusSummary(result: result),
           ),
       ],
     );

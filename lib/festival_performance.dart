@@ -5,6 +5,7 @@ import 'performance_controls.dart';
 const festivalTick = Duration(milliseconds: 125);
 const _ticksPerBeat = 4;
 const _ticksPerSecond = 8;
+const _mixCountdownLength = 3 * _ticksPerSecond;
 const _interludeLength = 4 * _ticksPerSecond;
 const _quickInterludeLength = 2 * _ticksPerSecond;
 const _outroLength = 2 * _ticksPerSecond;
@@ -12,7 +13,10 @@ const _joinGrace = 3 * _ticksPerSecond;
 const _frontProximityBoost = 14;
 const _readyMinimum = 46;
 const _readyMaximum = 58;
+const _generatorStartTick = 76 * _ticksPerSecond;
 const _generatorStopTick = 79 * _ticksPerSecond + _ticksPerBeat;
+const _marketNoiseStart = 24 * _ticksPerSecond;
+const _marketNoiseEnd = 28 * _ticksPerSecond;
 const _rescueBeats = 2;
 const _rewindTicks = 3 * _ticksPerSecond;
 const _maxEarlySignalBeats = 3;
@@ -83,16 +87,16 @@ class _MixChange {
 }
 
 const _clubChanges = [
-  _MixChange('앞줄 모니터 증폭', FestivalZone.front, 21, 28, 16),
+  _MixChange('앞줄 모니터 증폭', FestivalZone.front, 23, 28, 16),
   _MixChange('뒷벽 저음 반사', FestivalZone.back, 48, 56, 16),
   _MixChange('앞줄 스피커 감쇠', FestivalZone.front, 76, 82, -16),
-  _MixChange('뒷줄 스피커 감쇠', FestivalZone.back, 84, 88, -16),
+  _MixChange('뒷줄 스피커 감쇠', FestivalZone.back, 85, 89, -16),
 ];
 
 const _rooftopChanges = [
-  _MixChange('뒷줄에 맞바람', FestivalZone.back, 21, 29, -14),
+  _MixChange('뒷줄에 맞바람', FestivalZone.back, 23, 29, -14),
   _MixChange('앞줄에 맞바람', FestivalZone.front, 47, 56, -14),
-  _MixChange('뒷줄에 돌풍', FestivalZone.back, 76, 83, -16),
+  _MixChange('뒷줄에 돌풍', FestivalZone.back, 76, 82, -16),
   _MixChange('앞줄에 돌풍', FestivalZone.front, 85, 89, -16),
 ];
 
@@ -430,10 +434,10 @@ class FestivalPerformance {
 
   bool get generatorRunning =>
       venue.usesGenerator &&
-      _tick >= 76 * _ticksPerSecond &&
+      _tick >= _generatorStartTick &&
       _tick < _generatorEnd;
   Duration get generatorLoopPosition =>
-      festivalTick * ((_tick - 76 * _ticksPerSecond) % (2 * _ticksPerSecond));
+      festivalTick * ((_tick - _generatorStartTick) % (2 * _ticksPerSecond));
   bool get signalQueued => _reservedTick != null && _tick < _reservedTick!;
   bool get waveTowardBack => _waveTowardBack;
 
@@ -502,7 +506,7 @@ class FestivalPerformance {
     if (interlude == null) return null;
     final length = _interludeLengthForCurrentMix;
     final cut = interlude.previous.end * _ticksPerSecond + length;
-    final preview = interlude.next.preview * _ticksPerSecond;
+    final preview = _interludeLandingTick(interlude.next);
     final target = _signalOpensAt(interlude.next);
     final skipped = preview - _tick.clamp(cut, preview);
     return (
@@ -518,7 +522,7 @@ class FestivalPerformance {
   bool advancePastInterlude() {
     final interlude = _interlude;
     if (interlude == null) return false;
-    final preview = interlude.next.preview * _ticksPerSecond;
+    final preview = _interludeLandingTick(interlude.next);
     if (_tick >= preview) return false;
     final cut =
         interlude.previous.end * _ticksPerSecond +
@@ -526,6 +530,18 @@ class FestivalPerformance {
     if (_tick < cut) return false;
     advanceTicks(preview - _tick + _tick % _ticksPerBeat);
     return true;
+  }
+
+  int _interludeLandingTick(_Chorus next) {
+    final preview = next.preview * _ticksPerSecond;
+    var landing = preview;
+    for (final zone in FestivalZone.values) {
+      final change = _nextMixChangeTick(zone, preview - 1);
+      if (change != null) {
+        landing = math.min(landing, change - _mixCountdownLength);
+      }
+    }
+    return landing;
   }
 
   int get _interludeLengthForCurrentMix =>
@@ -609,7 +625,7 @@ class FestivalPerformance {
   (String, int?)? get _generatorVenueNotice {
     final due = switch (seconds) {
       >= 46 && < 48 => ('앞줄 관객 접근', 48 * _ticksPerSecond),
-      >= 74 && < 76 => ('발전기 가동', 76 * _ticksPerSecond),
+      >= 73 && < 76 => ('발전기 가동', _generatorStartTick),
       >= 76 && < 81 => ('발전기 정지', _generatorEnd),
       _ => null,
     };
@@ -642,15 +658,15 @@ class FestivalPerformance {
     for (final change in _mixChanges) {
       if (change.activeAt(seconds)) {
         final until = change.end * _ticksPerSecond - _tick;
-        return until <= 2 * _ticksPerSecond
+        return until <= _mixCountdownLength
             ? (
                 '${change.label} 끝',
                 (until + _ticksPerBeat - 1) ~/ _ticksPerBeat,
               )
             : (change.label, null);
       }
-      if (seconds >= change.start - 2 && seconds < change.start) {
-        final until = change.start * _ticksPerSecond - _tick;
+      final until = change.start * _ticksPerSecond - _tick;
+      if (until > 0 && until <= _mixCountdownLength) {
         return (change.label, (until + _ticksPerBeat - 1) ~/ _ticksPerBeat);
       }
     }
@@ -665,7 +681,9 @@ class FestivalPerformance {
   }
 
   bool get _marketNoise =>
-      venue == FestivalVenue.nightMarket && seconds >= 24 && seconds < 28;
+      venue == FestivalVenue.nightMarket &&
+      _tick >= _marketNoiseStart &&
+      _tick < _marketNoiseEnd;
 
   String _interludeNotice(_Chorus previous, _Chorus next) {
     if (seconds < previous.end + 2) {
@@ -708,6 +726,43 @@ class FestivalPerformance {
       minimum: _readyMinimum - modifier,
       maximum: _readyMaximum - modifier,
     );
+  }
+
+  int? mixTargetCountdown(FestivalZone zone) {
+    if (!concertStarted || !hasLiveRhythm) return null;
+    final change = _nextMixChangeTick(zone, _tick);
+    if (change == null || change - _tick > _mixCountdownLength) return null;
+    final practice = practiceChorus;
+    if (practice != null &&
+        change >= _choruses[practice - 1].end * _ticksPerSecond) {
+      return null;
+    }
+    return (change - _tick + _ticksPerSecond - 1) ~/ _ticksPerSecond;
+  }
+
+  int get _frontTargetTick =>
+      (practiceChorus == null ? _choruses.first.end : 48) * _ticksPerSecond;
+
+  int? _nextMixChangeTick(FestivalZone zone, int after) {
+    if (venue.usesGenerator) {
+      if (zone == FestivalZone.front) {
+        return after < _frontTargetTick ? _frontTargetTick : null;
+      }
+      if (venue == FestivalVenue.nightMarket) {
+        if (after < _marketNoiseStart) return _marketNoiseStart;
+        if (after < _marketNoiseEnd) return _marketNoiseEnd;
+      }
+      if (after < _generatorStartTick) return _generatorStartTick;
+      return after < _generatorEnd ? _generatorEnd : null;
+    }
+    for (final change in _mixChanges) {
+      if (change.zone != zone) continue;
+      final start = change.start * _ticksPerSecond;
+      final end = change.end * _ticksPerSecond;
+      if (start > after) return start;
+      if (end > after) return end;
+    }
+    return null;
   }
 
   FestivalZone? get recommendedSignalZone {
@@ -966,8 +1021,7 @@ class FestivalPerformance {
   int _mixModifier(FestivalZone zone) =>
       venue.usesGenerator &&
           zone == FestivalZone.front &&
-          seconds < 48 &&
-          _interlude != null
+          _tick >= _frontTargetTick
       ? _frontProximityBoost
       : _volumeModifier(zone);
 

@@ -957,6 +957,7 @@ class ZoneControlCard extends StatelessWidget {
     this.onInteractionEnd,
     this.selected = false,
     this.needsRescue = false,
+    this.targetCountdown,
   });
 
   final String zone;
@@ -971,6 +972,7 @@ class ZoneControlCard extends StatelessWidget {
   final VoidCallback? onInteractionEnd;
   final bool selected;
   final bool needsRescue;
+  final int? targetCountdown;
 
   @override
   Widget build(BuildContext context) {
@@ -1012,6 +1014,37 @@ class ZoneControlCard extends StatelessWidget {
                       '$volume%',
                       style: const TextStyle(color: _ink, fontSize: 13),
                     ),
+                    if (targetCountdown case final count?) ...[
+                      const SizedBox(width: 7),
+                      Semantics(
+                        label: '$zone 목표 변경까지 $count초',
+                        container: true,
+                        liveRegion: true,
+                        excludeSemantics: true,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF493624),
+                            border: Border.all(color: _amber),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 2,
+                            ),
+                            child: Text(
+                              '$count',
+                              style: const TextStyle(
+                                color: _amber,
+                                fontSize: 12,
+                                height: 1,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -58,6 +58,17 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('시작'));
       await tester.pump();
+      final frontDial = find.byType(ZoneVolumeSlider).first;
+      ({int minimum, int maximum})? frontTarget() =>
+          tester.widget<ZoneVolumeSlider>(frontDial).target;
+      for (final count in [3, 2, 1]) {
+        expect(find.bySemanticsLabel('앞줄 목표 변경까지 $count초'), findsOneWidget);
+        expect(find.bySemanticsLabel(RegExp('뒷줄 목표 변경까지')), findsNothing);
+        expect(frontTarget(), (minimum: 46, maximum: 58));
+        await tester.pump(const Duration(seconds: 1));
+      }
+      expect(find.bySemanticsLabel(RegExp('앞줄 목표 변경까지')), findsNothing);
+      expect(frontTarget(), (minimum: 30, maximum: 42));
       await tester.pump(festivalTick * (736 - scene().tick));
       await tester.pumpAndSettle();
 
@@ -475,7 +486,8 @@ void main() {
       await tester.ensureVisible(chorus);
       await tester.tap(chorus);
       await tester.pumpAndSettle();
-      expect(find.text('후렴 1 연습'), findsOneWidget);
+      expect(find.textContaining('동시 떼창'), findsOneWidget);
+      expect(find.textContaining('연습'), findsNothing);
       expect(nextShow.hitTestable(), findsOneWidget);
       expect(tester.getRect(nextShow), footerBounds);
       expect(records.concertBest, isNotNull);
@@ -637,33 +649,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('전체 결과'), findsOneWidget);
     expect(find.text('동네 축제 완료'), findsOneWidget);
-    expect(find.text('추천 연습'), findsOneWidget);
+    expect(find.text('추천 연습'), findsNothing);
     expect(find.textContaining('동시 떼창'), findsNothing);
     await tapLabel('후렴 1');
-    expect(find.text('후렴 1 연습'), findsOneWidget);
-    await tapLabel('후렴 2');
+    expect(find.textContaining('동시 떼창'), findsOneWidget);
     expect(find.text('후렴 1 연습'), findsNothing);
+    await tapLabel('후렴 2');
+    expect(find.textContaining('동시 떼창'), findsOneWidget);
     expect(find.textContaining('앞줄 미합류'), findsOneWidget);
-    await tapLabel('후렴 2 연습');
-    expect(find.text('후렴 2 연습'), findsOneWidget);
-    expect(
-      tester
-          .widget<ZoneVolumeSlider>(find.byType(ZoneVolumeSlider).first)
-          .value,
-      50,
-    );
-    await tester.pump(Duration(milliseconds: (496 - scene().tick) * 125));
-    await tester.pumpAndSettle();
-    expect(find.text('후렴 연습 결과'), findsOneWidget);
-    expect(find.text('이전 떼창 기록'), findsOneWidget);
-    expect(find.text('이번 떼창 기록'), findsOneWidget);
-    await tapLabel('전체 결과로');
-    expect(find.text('전체 결과'), findsOneWidget);
+    expect(find.text('후렴 2 연습'), findsNothing);
     expect(records.concertBest?.score, 42);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Combo practice opens and returns from results automatically', (
+  testWidgets('Combo break stays visible and replay starts a new concert', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 740));
@@ -700,24 +699,14 @@ void main() {
     await advanceTo(736);
     await tester.pumpAndSettle();
 
-    final retry = find.text('끊기기 3초 전부터 연습');
-    expect(retry, findsOneWidget);
+    expect(find.text('끊기기 3초 전부터 연습'), findsNothing);
+    expect(find.textContaining('콤보 끊김 · 후렴 1'), findsOneWidget);
     final saved = records.concertBest?.score;
     expect(saved, isNotNull);
-    await tester.tap(retry);
+    await tester.tap(find.text('다시 하기'));
     await tester.pumpAndSettle();
-    expect(scene().tick, inInclusiveRange(missedTick - 24, missedTick - 1));
-    expect(
-      tester.widget<ZoneVolumeSlider>(find.byType(ZoneVolumeSlider).last).value,
-      50,
-    );
-    await tester.pump(const Duration(seconds: 7));
-    await tester.pumpAndSettle();
-    expect(find.text('콤보 복구 연습 결과'), findsOneWidget);
-    expect(find.text('두 줄이 다시 합류했어요!'), findsOneWidget);
-    await tester.tap(find.text('전체 결과로'));
-    await tester.pumpAndSettle();
-    expect(find.text('전체 결과'), findsOneWidget);
+    expect(scene().tick, 160);
+    expect(find.text('두 노브를 민트색 눈금에 맞춰요'), findsOneWidget);
     expect(records.concertBest?.score, saved);
   });
 }

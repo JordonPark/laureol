@@ -103,7 +103,11 @@ void main() {
     _at(performance, 22);
     performance.setVolume(back, 50);
     performance.queue(front);
+    _at(performance, 31);
+    expect(performance.mixTargetCountdown(front), 3);
+    expect(performance.readyVolumeRange(front), (minimum: 46, maximum: 58));
     _at(performance, 34);
+    expect(performance.mixTargetCountdown(front), isNull);
     expect(performance.chorusScores, [28, 0, 0]);
     expect(performance.eventNotice, ('후렴 1 · 함께 떼창 9.0초', null));
     expect(performance.nextSignalCountdown, (
@@ -151,17 +155,26 @@ void main() {
     expect(performance.eventNotice.$1, startsWith('후렴 2 · 함께 떼창'));
     expect(performance.nextSignalCountdown, (
       chorus: 3,
-      remaining: 12,
-      total: 12,
+      remaining: 14,
+      total: 14,
     ));
     expect(performance.combo, 36);
     expect(performance.lightingTier, 2);
     _at(performance, 64);
     expect(performance.eventNotice.$1, contains('발전기가 켜지면 뒷줄'));
     expect(performance.advancePastInterlude(), isTrue);
-    expect(performance.position, const Duration(seconds: 74));
-    expect(performance.eventNotice, ('발전기 가동', 4));
-    expect(performance.nextSignalCountdown?.remaining, 8);
+    expect(performance.position, const Duration(seconds: 73));
+    expect(performance.eventNotice, ('발전기 가동', 6));
+    expect(performance.nextSignalCountdown?.remaining, 10);
+    expect(performance.mixTargetCountdown(back), 3);
+    _at(performance, 74);
+    expect(performance.mixTargetCountdown(back), 2);
+    _at(performance, 75);
+    expect(performance.mixTargetCountdown(back), 1);
+    expect(performance.readyVolumeRange(back), (minimum: 46, maximum: 58));
+    _at(performance, 76);
+    expect(performance.mixTargetCountdown(back), isNull);
+    expect(performance.readyVolumeRange(back), (minimum: 62, maximum: 74));
     _at(performance, 78);
     expect(performance.nextSignalCountdown, isNull);
     expect(performance.signal(front), SignalState.available);
@@ -357,10 +370,22 @@ void main() {
 
       _at(club, 20);
       _at(rooftop, 20);
-      expect(club.eventNotice, ('앞줄 모니터 증폭', 2));
-      expect(rooftop.eventNotice, ('뒷줄에 맞바람', 2));
-      _at(club, 22);
-      _at(rooftop, 22);
+      expect(club.eventNotice, ('앞줄 모니터 증폭', 6));
+      expect(rooftop.eventNotice, ('뒷줄에 맞바람', 6));
+      expect(club.mixTargetCountdown(back), isNull);
+      expect(rooftop.mixTargetCountdown(front), isNull);
+      for (final second in [20.0, 21.0, 22.0]) {
+        _at(club, second);
+        _at(rooftop, second);
+        expect(club.mixTargetCountdown(front), 23 - second.toInt());
+        expect(rooftop.mixTargetCountdown(back), 23 - second.toInt());
+        expect(club.readyVolumeRange(front), (minimum: 46, maximum: 58));
+        expect(rooftop.readyVolumeRange(back), (minimum: 46, maximum: 58));
+      }
+      _at(club, 23);
+      _at(rooftop, 23);
+      expect(club.mixTargetCountdown(front), isNull);
+      expect(rooftop.mixTargetCountdown(back), isNull);
       expect(club.readyVolumeRange(front), (minimum: 30, maximum: 42));
       expect(club.readyVolumeRange(back), (minimum: 46, maximum: 58));
       expect(rooftop.readyVolumeRange(front), (minimum: 46, maximum: 58));
