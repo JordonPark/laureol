@@ -161,6 +161,7 @@ class FestivalScene extends StatefulWidget {
     this.backCue = MixCue.none,
     this.readyPulse = 0,
     this.readyZones = 0,
+    this.signalPulse,
   });
 
   final int tick;
@@ -183,6 +184,7 @@ class FestivalScene extends StatefulWidget {
   final MixCue backCue;
   final int readyPulse;
   final int readyZones;
+  final ({int serial, int rows})? signalPulse;
 
   @override
   State<FestivalScene> createState() => _FestivalSceneState();
@@ -291,6 +293,24 @@ class _FestivalSceneState extends State<FestivalScene> {
                         ),
                       ),
                     ),
+                    if (widget.signalPulse case final signal?)
+                      IgnorePointer(
+                        child: TweenAnimationBuilder<double>(
+                          key: ValueKey(signal.serial),
+                          tween: Tween(begin: 0, end: 1),
+                          duration: const Duration(milliseconds: 560),
+                          builder: (context, progress, _) => CustomPaint(
+                            painter: _SignalPulsePainter(
+                              rows: signal.rows,
+                              progress: progress,
+                              compact: widget.compact,
+                              stationary: MediaQuery.disableAnimationsOf(
+                                context,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     if (widget.onZoneSelected != null)
                       LayoutBuilder(builder: _audienceTargets),
                     if (widget.combo > 0 && widget.comboEffect == null)
@@ -356,6 +376,75 @@ class _FestivalSceneState extends State<FestivalScene> {
       ],
     );
   }
+}
+
+class _SignalPulsePainter extends CustomPainter {
+  const _SignalPulsePainter({
+    required this.rows,
+    required this.progress,
+    required this.compact,
+    required this.stationary,
+  });
+
+  final int rows;
+  final double progress;
+  final bool compact;
+  final bool stationary;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress >= 1) return;
+    canvas.save();
+    canvas.scale(size.width / 360, size.height / (compact ? 265 : 324));
+    final mic = Offset(151, _sceneY(102, compact));
+    final paint = Paint()
+      ..color = const Color(0xFFFFD47D).withValues(alpha: 1 - progress)
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(mic, 8 + (stationary ? 4 : progress * 12), paint);
+
+    for (final zone in FestivalZone.values) {
+      if (rows & (1 << zone.index) == 0) continue;
+      final front = zone == FestivalZone.front;
+      final target = Offset(
+        front ? 135 : 174,
+        _sceneY(front ? 197 : 263, compact),
+      );
+      final travel = stationary ? 1.0 : Curves.easeOutCubic.transform(progress);
+      final center = Offset.lerp(mic, target, travel)!;
+      final spread = 20 + travel * 54;
+      canvas.drawArc(
+        Rect.fromCenter(center: center, width: spread, height: spread * .48),
+        .18,
+        2.78,
+        false,
+        paint,
+      );
+      if (travel > .2) {
+        final echo = Offset.lerp(mic, target, travel - .2)!;
+        canvas.drawArc(
+          Rect.fromCenter(
+            center: echo,
+            width: spread * .7,
+            height: spread * .34,
+          ),
+          .28,
+          2.58,
+          false,
+          paint,
+        );
+      }
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _SignalPulsePainter oldDelegate) =>
+      rows != oldDelegate.rows ||
+      progress != oldDelegate.progress ||
+      compact != oldDelegate.compact ||
+      stationary != oldDelegate.stationary;
 }
 
 class _ComboCelebration extends StatelessWidget {

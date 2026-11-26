@@ -40,6 +40,7 @@ class FestivalAudio {
   bool _generatorPlaying = false;
   int _generation = 0;
   int _lastCheckedTick = 0;
+  double _musicGain = 1;
   FestivalPerformance? _warningPerformance;
   int _heardWarnings = 0;
   int _lastWarningTick = -8;
@@ -48,10 +49,11 @@ class FestivalAudio {
     final generation = ++_generation;
     _running = true;
     _lastCheckedTick = performance.tick;
+    _musicGain = performance.musicGain;
     bool current() => _running && generation == _generation;
     try {
       await _music
-          .play(performance.position, current)
+          .play(performance.position, current, gain: _musicGain)
           .timeout(const Duration(seconds: 8));
     } on TimeoutException {
       // Gameplay can proceed if the device has not prepared audio in time.
@@ -74,6 +76,11 @@ class FestivalAudio {
     final generation = _generation;
     bool current() => _running && generation == _generation;
 
+    final gain = performance.musicGain;
+    if (gain != _musicGain) {
+      _musicGain = gain;
+      unawaited(_music.setGain(gain, current));
+    }
     if (performance.generatorRunning != _generatorPlaying) {
       _generatorPlaying = performance.generatorRunning;
       if (_generatorPlaying) {
@@ -208,15 +215,26 @@ class _Clip {
     if (!_disposed) await _load();
   });
 
-  Future<void> play(Duration position, bool Function() current) =>
+  Future<void> play(
+    Duration position,
+    bool Function() current, {
+    double? gain,
+  }) => _enqueue(() async {
+    if (_disposed || !current()) return;
+    final player = await _load();
+    if (_disposed || !current()) return;
+    if (gain != null) await player.setVolume(volume * gain);
+    if (_disposed || !current()) return;
+    if (position != Duration.zero || _used) await player.seek(position);
+    if (_disposed || !current()) return;
+    await player.resume();
+    _used = true;
+  });
+
+  Future<void> setGain(double gain, bool Function() current) =>
       _enqueue(() async {
         if (_disposed || !current()) return;
-        final player = await _load();
-        if (_disposed || !current()) return;
-        if (position != Duration.zero || _used) await player.seek(position);
-        if (_disposed || !current()) return;
-        await player.resume();
-        _used = true;
+        await _player?.setVolume(volume * gain);
       });
 
   Future<void> pause() => _enqueue(() async {

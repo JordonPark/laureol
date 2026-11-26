@@ -114,17 +114,19 @@ void main() {
     expect(performance.combo, 18);
     expect(performance.lightingTier, 1);
     expect(performance.holdingCombo, isTrue);
+    expect(performance.readyVolumeRange(front), (minimum: 32, maximum: 44));
+    expect(performance.status(front), CrowdStatus.loud);
 
     _at(performance, 36);
     expect(performance.eventNotice.$1, contains('앞줄 볼륨을 내려요'));
+    expect(performance.advancePastInterlude(), isFalse);
+    _at(performance, 36.125);
     performance.setVolume(front, 40);
     expect(performance.eventNotice.$1, contains('두 줄 ✓ 준비'));
-    expect(performance.status(front), CrowdStatus.quiet);
-    expect(performance.advancePastInterlude(), isFalse);
-    _at(performance, 38);
+    expect(performance.status(front), CrowdStatus.ready);
     expect(performance.nextSignalCountdown?.remaining, 8);
     expect(performance.advancePastInterlude(), isTrue);
-    expect(performance.position, const Duration(seconds: 46));
+    expect(performance.position, const Duration(milliseconds: 46125));
     expect(performance.combo, 18);
     expect(performance.advancePastInterlude(), isFalse);
     expect(performance.eventNotice, ('앞줄 관객 접근', 4));
@@ -149,14 +151,13 @@ void main() {
     expect(performance.eventNotice.$1, startsWith('후렴 2 · 함께 떼창'));
     expect(performance.nextSignalCountdown, (
       chorus: 3,
-      remaining: 16,
-      total: 16,
+      remaining: 12,
+      total: 12,
     ));
     expect(performance.combo, 36);
     expect(performance.lightingTier, 2);
     _at(performance, 64);
     expect(performance.eventNotice.$1, contains('발전기가 켜지면 뒷줄'));
-    _at(performance, 66);
     expect(performance.advancePastInterlude(), isTrue);
     expect(performance.position, const Duration(seconds: 74));
     expect(performance.eventNotice, ('발전기 가동', 4));
@@ -168,6 +169,30 @@ void main() {
     _at(performance, 83);
     expect(performance.lightingTier, 3);
     expect(performance.comboEffect, (count: 40, elapsedTicks: 0));
+  });
+
+  test('Sound check keeps four seconds when a row still needs adjustment', () {
+    final performance = FestivalPerformance();
+    _at(performance, 37.875);
+    expect(performance.advancePastInterlude(), isFalse);
+    _at(performance, 38);
+    expect(performance.advancePastInterlude(), isTrue);
+    expect(performance.position, const Duration(seconds: 46));
+  });
+
+  test('The final two seconds fade and preserve the finished score', () {
+    final performance = FestivalPerformance();
+    _at(performance, 90);
+    final score = performance.score;
+    expect(performance.musicGain, 1);
+    expect(performance.finished, isFalse);
+    _at(performance, 91);
+    expect(performance.musicGain, .5);
+    expect(performance.finished, isFalse);
+    _at(performance, 92);
+    expect(performance.musicGain, 0);
+    expect(performance.finished, isTrue);
+    expect(performance.score, score);
   });
 
   test('A missed beat ends the combo after the next chorus grace period', () {
@@ -292,7 +317,7 @@ void main() {
 
   test('Replay uses the original audio offset and drops expired cues', () {
     final performance = FestivalPerformance();
-    _at(performance, 100);
+    _at(performance, 92);
     expect(performance.takeRecentCues(), isEmpty);
     final replay = FestivalPerformance.replay(
       performance.chorusResult(3).checkpoint,

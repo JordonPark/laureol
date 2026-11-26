@@ -425,7 +425,7 @@ void main() {
       final closingTick = tester
           .widget<FestivalScene>(find.byType(FestivalScene))
           .tick;
-      await tester.pump(festivalTick * (799 - closingTick));
+      await tester.pump(festivalTick * (735 - closingTick));
       expect(find.byType(FestivalScene), findsOneWidget);
       expect(find.text('전체 결과'), findsNothing);
       await tester.pump(festivalTick);
@@ -559,6 +559,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('신호 예약'), findsOneWidget);
+    expect(scene().signalPulse?.rows, 1 << FestivalZone.front.index);
+    expect(scene().front, CrowdStatus.ready);
     expect(find.textContaining('남은 박'), findsNothing);
     expect(checkControlsInView(), cardBounds);
 
@@ -585,7 +587,7 @@ void main() {
     expect(scene().waveFrame, isNotNull);
     expect(checkControlsInView(), cardBounds);
 
-    await tester.pump(Duration(milliseconds: (800 - scene().tick) * 125));
+    await tester.pump(Duration(milliseconds: (736 - scene().tick) * 125));
     await tester.pumpAndSettle();
     expect(find.text('전체 결과'), findsOneWidget);
     expect(find.text('동네 축제 완료'), findsOneWidget);
@@ -649,7 +651,7 @@ void main() {
     await tester.drag(rearTrack, const Offset(0, -54));
     await advanceTo(252);
     expect(find.text('10 콤보!'), findsNothing);
-    await advanceTo(800);
+    await advanceTo(736);
     await tester.pumpAndSettle();
 
     final retry = find.text('끊기기 3초 전부터 연습');

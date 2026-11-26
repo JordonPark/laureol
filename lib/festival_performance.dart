@@ -6,6 +6,8 @@ const festivalTick = Duration(milliseconds: 125);
 const _ticksPerBeat = 4;
 const _ticksPerSecond = 8;
 const _interludeLength = 4 * _ticksPerSecond;
+const _quickInterludeLength = 2 * _ticksPerSecond;
+const _outroLength = 2 * _ticksPerSecond;
 const _joinGrace = 3 * _ticksPerSecond;
 const _frontProximityBoost = 14;
 const _readyMinimum = 56;
@@ -339,13 +341,20 @@ class FestivalPerformance {
 
   int get maximum => practiceChorus == null ? 90 : 30;
   bool get finished {
-    final end =
-        (practiceChorus == null ? 100 : _choruses[practiceChorus! - 1].end) *
-        _ticksPerSecond;
+    final practice = practiceChorus;
+    final end = practice == null
+        ? _outroStart + _outroLength
+        : _choruses[practice - 1].end * _ticksPerSecond;
     final drill = recovery;
     return _tick >= end ||
         (drill != null && _tick >= drill.missedTick + _rewindTicks);
   }
+
+  int get _outroStart => _choruses.last.end * _ticksPerSecond;
+
+  double get musicGain => practiceChorus == null
+      ? 1 - (_tick - _outroStart).clamp(0, _outroLength) / _outroLength
+      : 1;
 
   bool get generatorRunning =>
       _tick >= 76 * _ticksPerSecond && _tick < _generatorEnd;
@@ -417,7 +426,8 @@ class FestivalPerformance {
   ({int chorus, int remaining, int total})? get nextSignalCountdown {
     final interlude = _interlude;
     if (interlude == null) return null;
-    final cut = interlude.previous.end * _ticksPerSecond + _interludeLength;
+    final length = _interludeLengthForCurrentMix;
+    final cut = interlude.previous.end * _ticksPerSecond + length;
     final preview = interlude.next.preview * _ticksPerSecond;
     final target = _signalOpensAt(interlude.next);
     final skipped = preview - _tick.clamp(cut, preview);
@@ -425,7 +435,7 @@ class FestivalPerformance {
       chorus: interlude.next.number,
       remaining:
           (target - _tick - skipped + _ticksPerBeat - 1) ~/ _ticksPerBeat,
-      total: (_interludeLength + target - preview) ~/ _ticksPerBeat,
+      total: (length + target - preview) ~/ _ticksPerBeat,
     );
   }
 
@@ -434,12 +444,21 @@ class FestivalPerformance {
   bool advancePastInterlude() {
     final interlude = _interlude;
     if (interlude == null) return false;
-    final cut = interlude.previous.end * _ticksPerSecond + _interludeLength;
     final preview = interlude.next.preview * _ticksPerSecond;
-    if (_tick < cut || _tick >= preview) return false;
-    advanceTicks(preview - cut);
+    if (_tick >= preview) return false;
+    final cut =
+        interlude.previous.end * _ticksPerSecond +
+        _interludeLengthForCurrentMix;
+    if (_tick < cut) return false;
+    advanceTicks(preview - _tick + _tick % _ticksPerBeat);
     return true;
   }
+
+  int get _interludeLengthForCurrentMix =>
+      _mixLevel(FestivalZone.front) == CrowdStatus.ready &&
+          _mixLevel(FestivalZone.back) == CrowdStatus.ready
+      ? _quickInterludeLength
+      : _interludeLength;
 
   int get remainingBeats {
     final chorus = _chorusAt(_tick);
@@ -569,7 +588,7 @@ class FestivalPerformance {
   int volume(FestivalZone zone) => _volumes[zone.index];
 
   ({int minimum, int maximum}) readyVolumeRange(FestivalZone zone) {
-    final spill = _volumes[1 - zone.index] / 5 + _volumeModifier(zone);
+    final spill = _volumes[1 - zone.index] / 5 + _mixModifier(zone);
     return (
       minimum: (_readyMinimum - spill).ceil(),
       maximum: (_readyMaximum - spill).floor(),
@@ -603,13 +622,13 @@ class FestivalPerformance {
 
   int get volumeWarningMask {
     if (!hasLiveRhythm) return 0;
-    return (_levels[0] == CrowdStatus.ready ? 0 : 1) |
-        (_levels[1] == CrowdStatus.ready ? 0 : 2);
+    return (_mixLevel(FestivalZone.front) == CrowdStatus.ready ? 0 : 1) |
+        (_mixLevel(FestivalZone.back) == CrowdStatus.ready ? 0 : 2);
   }
 
   MixCue cueFor(FestivalZone zone) {
     if (finished || seconds >= _choruses.last.end) return MixCue.none;
-    if (_levels[zone.index] != CrowdStatus.ready) return MixCue.adjust;
+    if (_mixLevel(zone) != CrowdStatus.ready) return MixCue.adjust;
     final signalZone = recommendedSignalZone;
     return signalZone == zone ||
             (signalZone == FestivalZone.back &&
@@ -619,10 +638,10 @@ class FestivalPerformance {
   }
 
   CrowdStatus status(FestivalZone zone) {
-    final i = zone.index;
-    return _singing[i] && _levels[i] == CrowdStatus.ready
+    final level = _mixLevel(zone);
+    return _singing[zone.index] && level == CrowdStatus.ready
         ? CrowdStatus.singing
-        : _levels[i];
+        : level;
   }
 
   SignalState signal(FestivalZone zone) {
@@ -638,14 +657,10 @@ class FestivalPerformance {
   }
 
   void setVolume(FestivalZone zone, int value) {
-    final previous = List.of(_levels);
+    final previousWarnings = volumeWarningMask;
     _volumes[zone.index] = value.clamp(0, 100);
     _refreshLevels();
-    if (!finished &&
-        _chorusAt(_tick) != null &&
-        (previous[0] != CrowdStatus.ready && _levels[0] == CrowdStatus.ready ||
-            previous[1] != CrowdStatus.ready &&
-                _levels[1] == CrowdStatus.ready)) {
+    if (previousWarnings & ~volumeWarningMask != 0) {
       _cues.add((FestivalCue.applause, _tick));
     }
   }
@@ -823,6 +838,18 @@ class FestivalPerformance {
       : _marketNoise
       ? -10
       : 0;
+
+  int _mixModifier(FestivalZone zone) =>
+      zone == FestivalZone.front && seconds < 48 && _interlude != null
+      ? _frontProximityBoost
+      : _volumeModifier(zone);
+
+  CrowdStatus _mixLevel(FestivalZone zone) {
+    final modifier = _mixModifier(zone);
+    return modifier == _volumeModifier(zone)
+        ? _levels[zone.index]
+        : _levelFor(zone.index, modifier);
+  }
 
   CrowdStatus _levelFor(int index, int modifier) {
     final heard = (_volumes[index] + _volumes[1 - index] / 5 + modifier).clamp(

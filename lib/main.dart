@@ -546,6 +546,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   FestivalZone? _focusedZone;
   int _readyPulse = 0;
   int _readyZones = 0;
+  ({int serial, int rows})? _signalPulse;
 
   bool get _waitingForRehearsalInput =>
       _rehearsalStep == _RehearsalStep.volume ||
@@ -553,6 +554,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
 
   FestivalPerformance _newPerformance() {
     _readyZones = 0;
+    _signalPulse = null;
     _preparingConcert = false;
     final recovery = widget.recovery;
     if (recovery != null) {
@@ -626,9 +628,11 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   void _sendSignal(FestivalZone zone) {
     if (_performance.signal(zone) != SignalState.available) return;
     final rehearsing = _rehearsalStep == _RehearsalStep.signal;
+    final rows = _performance.startsBothRows(zone) ? 3 : 1 << zone.index;
     setState(() {
       _focusedZone = zone;
       _performance.queue(zone);
+      _signalPulse = (serial: (_signalPulse?.serial ?? 0) + 1, rows: rows);
       if (rehearsing) _rehearsalStep = _RehearsalStep.response;
     });
     if (widget.records.vibration) unawaited(HapticFeedback.selectionClick());
@@ -955,6 +959,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       backCue: _mixCue(FestivalZone.back),
       readyPulse: _readyPulse,
       readyZones: _readyZones,
+      signalPulse: _signalPulse,
     );
   }
 

@@ -677,6 +677,7 @@ class SignalButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final action = state == SignalState.available ? onPressed : null;
+    final queued = state == SignalState.queued;
     final text = label ?? state.label;
     final phase = MediaQuery.disableAnimationsOf(context) ? 0.0 : beatPhase;
     return Semantics(
@@ -694,10 +695,14 @@ class SignalButton extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: action == null ? _line : _amber,
+              color: action != null
+                  ? _amber
+                  : queued
+                  ? const Color(0xFF493624)
+                  : _line,
               borderRadius: BorderRadius.circular(8),
               border: action == null
-                  ? null
+                  ? (queued ? Border.all(color: _amber) : null)
                   : Border.all(
                       width: 2,
                       color: Color.lerp(
@@ -714,11 +719,12 @@ class SignalButton extends StatelessWidget {
               children: [
                 if (action != null)
                   const CustomPaint(size: Size(12, 12), painter: _SignalMark()),
+                if (queued) const Text('✓', style: TextStyle(color: _amber)),
                 Text(
                   text,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: action == null ? _ink : _panel,
+                    color: action != null ? _panel : (queued ? _amber : _ink),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
