@@ -942,6 +942,78 @@ class PerformanceScore extends StatelessWidget {
   }
 }
 
+class BeatProgress extends StatelessWidget {
+  const BeatProgress({
+    super.key,
+    required this.beat,
+    required this.phase,
+    required this.active,
+    required this.signalReady,
+  });
+
+  static const height = 4.0;
+  final int beat;
+  final double phase;
+  final bool active;
+  final bool signalReady;
+
+  @override
+  Widget build(BuildContext context) {
+    final phaseWithinBeat = MediaQuery.disableAnimationsOf(context)
+        ? 1.0
+        : phase;
+    return Semantics(
+      container: active,
+      label: active ? '박자 진행' : null,
+      value: active ? '한 마디의 ${beat + 1}번째 박' : null,
+      child: SizedBox(
+        width: double.infinity,
+        height: height,
+        child: CustomPaint(
+          painter: _BeatProgressPainter(
+            progress: active ? beat + phaseWithinBeat : 0,
+            color: signalReady ? _amber : const Color(0xFFB39BE1),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BeatProgressPainter extends CustomPainter {
+  const _BeatProgressPainter({required this.progress, required this.color});
+
+  final double progress;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const gap = 4.0;
+    final width = (size.width - 3 * gap) / 4;
+    if (width <= 0) return;
+    final paint = Paint();
+    for (var index = 0; index < 4; index++) {
+      final rect = Rect.fromLTWH(index * (width + gap), 0, width, size.height);
+      final track = RRect.fromRectAndRadius(rect, const Radius.circular(2));
+      paint.color = const Color(0xFF49405F);
+      canvas.drawRRect(track, paint);
+      final fraction = (progress - index).clamp(0.0, 1.0);
+      if (fraction <= 0) continue;
+      canvas.save();
+      canvas.clipRect(
+        Rect.fromLTWH(rect.left, 0, width * fraction, size.height),
+      );
+      paint.color = color;
+      canvas.drawRRect(track, paint);
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BeatProgressPainter oldDelegate) =>
+      progress != oldDelegate.progress || color != oldDelegate.color;
+}
+
 class ZoneControlCard extends StatelessWidget {
   const ZoneControlCard({
     super.key,

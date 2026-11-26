@@ -789,6 +789,7 @@ class FestivalPerformance {
       bothRowsReady;
 
   double get beatPhase => (_tick % _ticksPerBeat) / _ticksPerBeat;
+  int get beatInMeasure => _tick ~/ _ticksPerBeat % 4;
   bool get hasLiveRhythm => !finished && seconds < _choruses.last.end;
 
   int get volumeWarningMask {

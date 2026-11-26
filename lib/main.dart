@@ -1072,6 +1072,8 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   }
 
   Widget _buildPerformance(BuildContext context, BoxConstraints viewport) {
+    const beatBarGap = 4.0;
+    const beatBarSpace = BeatProgress.height + beatBarGap;
     final chorus = widget.checkpoint?.chorus;
     final performance = _performance;
     final readyToStart = performance.bothRowsReady;
@@ -1092,7 +1094,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
         safeWidth >= 600 &&
         viewport.maxWidth > viewport.maxHeight;
     final fullSceneHeight = (math.min(safeWidth, 520.0) - 32) * 324 / 360;
-    final mixerHeight = (math.min(safeWidth, 520.0) - 32) / 2;
+    final mixerHeight = (math.min(safeWidth, 520.0) - 32) / 2 + beatBarSpace;
     // Leave room for the score, knobs, and shared signal button.
     final compact =
         standardText &&
@@ -1167,14 +1169,25 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: sideBySide
-              ? math.max(176, (bodyHeight - 190) * 2 + 8)
+              ? math.max(176, (bodyHeight - 190 - beatBarSpace) * 2 + 8)
               : 520,
         ),
-        child: Row(
+        child: Column(
           children: [
-            Expanded(child: _volumeControl(FestivalZone.front)),
-            const SizedBox(width: 8),
-            Expanded(child: _volumeControl(FestivalZone.back)),
+            BeatProgress(
+              beat: performance.beatInMeasure,
+              phase: performance.beatPhase,
+              active: !_preparingConcert && performance.hasLiveRhythm,
+              signalReady: signalState == SignalState.available,
+            ),
+            const SizedBox(height: beatBarGap),
+            Row(
+              children: [
+                Expanded(child: _volumeControl(FestivalZone.front)),
+                const SizedBox(width: 8),
+                Expanded(child: _volumeControl(FestivalZone.back)),
+              ],
+            ),
           ],
         ),
       ),

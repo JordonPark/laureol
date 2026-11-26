@@ -54,10 +54,13 @@ void main() {
       FestivalScene scene() => tester.widget(find.byType(FestivalScene));
       expect(scene().venue, FestivalVenue.liveClub);
       final rear = _dialGesture(find.byType(ZoneVolumeSlider).last);
+      BeatProgress beatBar() => tester.widget(find.byType(BeatProgress));
+      expect(beatBar().active, isFalse);
       await tester.drag(rear, const Offset(0, -30));
       await tester.pump();
       await tester.tap(find.text('시작'));
       await tester.pump();
+      expect(beatBar().active, isTrue);
       final frontDial = find.byType(ZoneVolumeSlider).first;
       ({int minimum, int maximum})? frontTarget() =>
           tester.widget<ZoneVolumeSlider>(frontDial).target;
@@ -65,7 +68,11 @@ void main() {
         expect(find.bySemanticsLabel('앞줄 목표 변경까지 $count초'), findsOneWidget);
         expect(find.bySemanticsLabel(RegExp('뒷줄 목표 변경까지')), findsNothing);
         expect(frontTarget(), (minimum: 46, maximum: 58));
-        await tester.pump(const Duration(seconds: 1));
+        expect(beatBar().beat, count == 2 ? 2 : 0);
+        expect(beatBar().phase, 0);
+        await tester.pump(festivalTick);
+        expect(beatBar().phase, .25);
+        await tester.pump(festivalTick * 7);
       }
       expect(find.bySemanticsLabel(RegExp('앞줄 목표 변경까지')), findsNothing);
       expect(frontTarget(), (minimum: 30, maximum: 42));
@@ -396,10 +403,12 @@ void main() {
 
       final safeBounds = padding.deflateRect(Offset.zero & size);
       final cards = find.byType(ZoneControlCard);
+      final beatBar = find.byType(BeatProgress);
       expect(cards, findsNWidgets(2));
       expect(find.text('두 노브를 민트색 눈금에 맞춰요'), findsOneWidget);
       for (final target in [
         find.byType(FestivalScene),
+        beatBar,
         cards.first,
         cards.last,
         find.byType(SignalButton),
@@ -410,6 +419,10 @@ void main() {
         expect(bounds.top, greaterThanOrEqualTo(safeBounds.top));
         expect(bounds.bottom, lessThanOrEqualTo(safeBounds.bottom));
       }
+      expect(
+        tester.getBottomLeft(beatBar).dy,
+        lessThan(tester.getTopLeft(cards.first).dy),
+      );
       expect(Scrollable.of(tester.element(cards.first)).position.pixels, 0);
       expect(find.byType(ZoneVolumeSlider).hitTestable(), findsNWidgets(2));
       expect(find.byType(SignalButton).hitTestable(), findsOneWidget);
