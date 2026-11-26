@@ -1043,14 +1043,11 @@ class ZoneControlCard extends StatelessWidget {
     final stackFooter = footerTextSize > 14;
     final footerLineHeight = footerTextSize * 1.5 + 6;
     final statusBadge = CrowdStatusBadge(status: status, compact: true);
-    final goal = ExcludeSemantics(
-      child: Text(
-        '목표 ${target.minimum}–${target.maximum}%',
-        style: const TextStyle(
-          color: _mint,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-        ),
+    final goal = SizedBox(
+      width: stackFooter ? 102 : 72,
+      height: 14,
+      child: CustomPaint(
+        painter: _VolumeTargetPainter(value: volume, target: target),
       ),
     );
     return AspectRatio(
@@ -1107,11 +1104,17 @@ class ZoneControlCard extends StatelessWidget {
               ),
             ),
             SizedBox(
-              height: stackFooter ? footerLineHeight * 2 : footerLineHeight,
+              height: stackFooter ? footerLineHeight + 18 : footerLineHeight,
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: stackFooter
-                    ? Column(children: [statusBadge, goal])
+                    ? Column(
+                        children: [
+                          statusBadge,
+                          const SizedBox(height: 4),
+                          goal,
+                        ],
+                      )
                     : Row(
                         children: [statusBadge, const SizedBox(width: 6), goal],
                       ),
@@ -1122,4 +1125,55 @@ class ZoneControlCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _VolumeTargetPainter extends CustomPainter {
+  const _VolumeTargetPainter({required this.value, required this.target});
+
+  final int value;
+  final ({int minimum, int maximum}) target;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.height / 2;
+    double position(int percent) => 4 + (size.width - 8) * percent / 100;
+
+    final track = RRect.fromRectAndRadius(
+      Rect.fromLTRB(position(0), center - 2, position(100), center + 2),
+      const Radius.circular(2),
+    );
+    canvas.drawRRect(track, Paint()..color = _line);
+
+    final band = RRect.fromRectAndRadius(
+      Rect.fromLTRB(
+        position(target.minimum),
+        center - 3,
+        position(target.maximum),
+        center + 3,
+      ),
+      const Radius.circular(2),
+    );
+    canvas.drawRRect(band, Paint()..color = _mint);
+
+    final pointer = position(value);
+    final marker = Path()
+      ..moveTo(pointer, center - 4.5)
+      ..lineTo(pointer + 3, center)
+      ..lineTo(pointer, center + 4.5)
+      ..lineTo(pointer - 3, center)
+      ..close();
+    canvas
+      ..drawPath(
+        marker,
+        Paint()
+          ..color = const Color(0xFF171525)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      )
+      ..drawPath(marker, Paint()..color = _ink);
+  }
+
+  @override
+  bool shouldRepaint(covariant _VolumeTargetPainter oldDelegate) =>
+      value != oldDelegate.value || target != oldDelegate.target;
 }

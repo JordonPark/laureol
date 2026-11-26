@@ -168,7 +168,17 @@ void main() {
     final frontBefore = dial(sliders.first);
     final rearBefore = dial(sliders.last);
     final frontBounds = tester.getRect(_dialGesture(sliders.first));
-    expect(find.text('목표 48–60%'), findsOneWidget);
+    final frontTrack = find
+        .descendant(
+          of: find.byType(ZoneControlCard).first,
+          matching: find.byType(CustomPaint),
+        )
+        .last;
+    final guideBefore = tester.widget<CustomPaint>(frontTrack).painter!;
+    expect(tester.widget<ZoneVolumeSlider>(sliders.first).target, (
+      minimum: 48,
+      maximum: 60,
+    ));
 
     await tester.drag(_dialGesture(sliders.last), const Offset(0, 120));
     await tester.pump();
@@ -178,7 +188,21 @@ void main() {
       tester.widget<FestivalScene>(find.byType(FestivalScene)).front,
       CrowdStatus.quiet,
     );
-    expect(find.text('목표 56–68%'), findsOneWidget);
+    expect(find.textContaining('목표 56'), findsNothing);
+    expect(
+      tester
+          .getSemantics(find.bySemanticsLabel('앞줄 볼륨'))
+          .getSemanticsData()
+          .value,
+      '50%, 준비 구간 56%에서 68%',
+    );
+    expect(
+      tester
+          .widget<CustomPaint>(frontTrack)
+          .painter!
+          .shouldRepaint(guideBefore),
+      isTrue,
+    );
     expect(tester.getRect(_dialGesture(sliders.first)), frontBounds);
     expect(dial(sliders.first).shouldRepaint(frontBefore), isFalse);
     expect(dial(sliders.last).shouldRepaint(rearBefore), isTrue);
