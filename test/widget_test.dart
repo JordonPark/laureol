@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laureol/concert_stage_art.dart';
 import 'package:laureol/festival_performance.dart';
 import 'package:laureol/festival_records.dart';
 import 'package:laureol/festival_scene.dart';
@@ -26,6 +27,35 @@ void main() {
 
     expect(find.bySemanticsLabel('라우럴! 볼륨 좀 올려'), findsOneWidget);
   });
+
+  testWidgets(
+    'The stage catalog previews 200 variants apart from tour records',
+    (tester) async {
+      final art = StageSet.values.expand((set) => set.stages).toList();
+      expect(art, hasLength(200));
+      expect(art.map((stage) => stage.id).toSet(), hasLength(200));
+      final tourArt = FestivalVenue.tourVenues.map(
+        (venue) => ConcertStageArt.forVenue(venue)!.id,
+      );
+      expect(art.map((stage) => stage.id), containsAll(tourArt));
+      expect(tourArt.toSet(), hasLength(FestivalVenue.tourVenues.length));
+
+      await tester.binding.setSurfaceSize(const Size(390, 740));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(LaureolApp(records: records));
+      for (final label in ['공연 시작', '투어 48곳', '무대 도감', '골목과 광장']) {
+        final button = find.text(label);
+        expect(button.hitTestable(), findsOneWidget);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('기와 정자 · 기본'), findsOneWidget);
+      final last = find.text('골목 차양 · 피날레');
+      await tester.scrollUntilVisible(last, 260);
+      expect(last.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'Tour opens a region, plays a venue, and reflects its saved result',

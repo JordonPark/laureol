@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'concert_stage_art.dart';
 import 'festival_performance.dart';
 import 'performance_controls.dart';
 
@@ -226,6 +227,7 @@ class FestivalScene extends StatefulWidget {
 class _FestivalSceneState extends State<FestivalScene> {
   final _images = <_Sprite, ui.Image>{};
   ui.Image? _interior;
+  ui.Image? _stageAtlas;
   bool _failed = false;
 
   @override
@@ -233,11 +235,20 @@ class _FestivalSceneState extends State<FestivalScene> {
     super.initState();
     _loadSprites();
     _loadInterior(_interiorRegion(widget.venue));
+    if (ConcertStageArt.forVenue(widget.venue) case final art?) {
+      _loadStage(art.set);
+    }
   }
 
   @override
   void didUpdateWidget(covariant FestivalScene oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final stageSet = ConcertStageArt.forVenue(widget.venue)?.set;
+    if (stageSet != ConcertStageArt.forVenue(oldWidget.venue)?.set) {
+      _stageAtlas?.dispose();
+      _stageAtlas = null;
+      if (stageSet != null) _loadStage(stageSet);
+    }
     final region = _interiorRegion(widget.venue);
     if (region == _interiorRegion(oldWidget.venue)) return;
     _interior?.dispose();
@@ -310,9 +321,31 @@ class _FestivalSceneState extends State<FestivalScene> {
     }
   }
 
+  Future<void> _loadStage(StageSet set) async {
+    try {
+      final image = await decodeStageAtlas(set);
+      if (!mounted || set != ConcertStageArt.forVenue(widget.venue)?.set) {
+        image.dispose();
+        return;
+      }
+      final previous = _stageAtlas;
+      setState(() => _stageAtlas = image);
+      previous?.dispose();
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'concert stage atlas',
+        ),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _interior?.dispose();
+    _stageAtlas?.dispose();
     for (final image in _images.values) {
       image.dispose();
     }
@@ -360,6 +393,7 @@ class _FestivalSceneState extends State<FestivalScene> {
                         painter: _FestivalPainter(
                           images: _images,
                           interior: _interior,
+                          stageAtlas: _stageAtlas,
                           tick: widget.tick,
                           front: widget.front,
                           back: widget.back,
@@ -645,6 +679,7 @@ class _FestivalPainter extends CustomPainter {
   _FestivalPainter({
     required Map<_Sprite, ui.Image> images,
     required this.interior,
+    required this.stageAtlas,
     required this.tick,
     required this.front,
     required this.back,
@@ -669,6 +704,7 @@ class _FestivalPainter extends CustomPainter {
 
   final Map<_Sprite, ui.Image> images;
   final ui.Image? interior;
+  final ui.Image? stageAtlas;
   final TourRegion interiorRegion;
   final int tick;
   final CrowdStatus front;
@@ -1043,6 +1079,17 @@ class _FestivalPainter extends CustomPainter {
   }
 
   void _drawTourStage(Canvas canvas, TourStage form) {
+    final art = ConcertStageArt.forVenue(venue);
+    final atlas = stageAtlas;
+    if (art != null && atlas != null) {
+      canvas.drawImageRect(
+        atlas,
+        art.source,
+        Rect.fromLTWH(0, 0, 360, _y(180)),
+        _nearest,
+      );
+      return;
+    }
     final accent = Color(venue.accent);
     final tinted = Color.lerp(const Color(0xFFFFFFFF), accent, .35);
     final (sprite, height) = switch (form) {
@@ -1269,6 +1316,7 @@ class _FestivalPainter extends CustomPainter {
       readyZones != oldDelegate.readyZones ||
       pulseProgress != oldDelegate.pulseProgress ||
       interior != oldDelegate.interior ||
+      stageAtlas != oldDelegate.stageAtlas ||
       activeMixZone != oldDelegate.activeMixZone ||
       reducedMotion != oldDelegate.reducedMotion ||
       venue != oldDelegate.venue ||

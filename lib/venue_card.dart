@@ -2,6 +2,7 @@
 // ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 
+import 'concert_stage_art.dart';
 import 'festival_performance.dart';
 
 class VenueCard extends StatelessWidget {
@@ -173,15 +174,7 @@ class VenueArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stage = switch (venue.stage) {
-      TourStage.canopy => 'stage.png',
-      TourStage.theatre => 'stage-club.png',
-      TourStage.deck => 'stage-rooftop.png',
-      TourStage.studio => 'stage-tour-studio.png',
-      TourStage.rig => 'stage-tour-rig.png',
-      TourStage.arena => 'stage-tour-arena.png',
-      null => null,
-    };
+    final stage = ConcertStageArt.forVenue(venue);
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -196,20 +189,9 @@ class VenueArtwork extends StatelessWidget {
           Align(
             alignment: const Alignment(.90, .63),
             child: FractionallySizedBox(
-              widthFactor: venue.stage == TourStage.arena ? .68 : .58,
+              widthFactor: .79,
               heightFactor: .96,
-              child: Image.asset(
-                'docs/art/festival/$stage',
-                color: Color.lerp(
-                  const Color(0xFFFFFFFF),
-                  Color(venue.accent),
-                  .25,
-                ),
-                colorBlendMode: BlendMode.modulate,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.none,
-                excludeFromSemantics: true,
-              ),
+              child: ConcertStagePreview(stage),
             ),
           ),
       ],

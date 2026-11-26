@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'chorus_summary.dart';
+import 'concert_stage_art.dart';
 import 'festival_audio.dart';
 import 'festival_performance.dart';
 import 'festival_records.dart';
@@ -499,6 +500,11 @@ class _TourScreen extends StatelessWidget {
       title: '공연 투어',
       compact: bounds.maxHeight < 480,
       maxWidth: wide ? 880 : 520,
+      trailing: CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: () => _open(context, const _StageCatalogScreen()),
+        child: const Text('무대 도감'),
+      ),
       children: _cardRows(cards, paired: grid),
     );
   }
@@ -584,6 +590,97 @@ class _TourScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _StageCatalogScreen extends StatelessWidget {
+  const _StageCatalogScreen();
+
+  @override
+  Widget build(BuildContext context) => _Screen(
+    title: '무대 도감',
+    maxWidth: 740,
+    children: _cardRows([
+      for (final set in StageSet.values)
+        CupertinoButton(
+          onPressed: () => _open(context, _StageSetScreen(set: set)),
+          padding: EdgeInsets.zero,
+          child: _StageTile(art: set.stages.first, label: set.title),
+        ),
+    ], paired: _stageCatalogUsesColumns(context)),
+  );
+}
+
+class _StageSetScreen extends StatelessWidget {
+  const _StageSetScreen({required this.set});
+
+  final StageSet set;
+
+  @override
+  Widget build(BuildContext context) => _Screen(
+    title: set.title,
+    maxWidth: 740,
+    children: _cardRows([
+      for (final art in set.stages) _StageTile(art: art, label: art.title),
+    ], paired: _stageCatalogUsesColumns(context)),
+  );
+}
+
+bool _stageCatalogUsesColumns(BuildContext context) =>
+    MediaQuery.sizeOf(context).width -
+            MediaQuery.paddingOf(context).horizontal >=
+        350 &&
+    MediaQuery.textScalerOf(context).scale(15) < 21;
+
+class _StageTile extends StatelessWidget {
+  const _StageTile({required this.art, required this.label});
+
+  final ConcertStageArt art;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: const Color(0xFF252037),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Color(art.set.backdrop.accent).withAlpha(90)),
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AspectRatio(
+            aspectRatio: 2,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  art.set.backdrop.backdrop,
+                  fit: BoxFit.cover,
+                  cacheWidth: 480,
+                  color: const Color(0xFFA9A1C0),
+                  colorBlendMode: BlendMode.modulate,
+                  excludeFromSemantics: true,
+                ),
+                ConcertStagePreview(art),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: _paper,
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _TourRegionScreen extends StatelessWidget {

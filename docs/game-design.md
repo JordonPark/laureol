@@ -1035,3 +1035,143 @@
 > Use case: stylized-concept. Asset type: one true-transparent 2-by-2 atlas for a Korean 2.5D mobile rhythm game's performance scenery, square canvas. Exactly four game props with one prop in the middle of each quadrant. TOP LEFT is a short-wide snow tipped spruce tree in a square dark wooden planter. TOP RIGHT is a tall freestanding outdoor heater with a glowing gold core and protective dark metal rails. BOTTOM LEFT is a snowy violet-blue park bench with a small snow bank under one foot only. BOTTOM RIGHT is a small red cargo sled carrying two compact bundled black music road cases. Keep objects completely separate with generous fully transparent margins around all four and a thick transparent vertical and horizontal cross gutter through the exact image center. Each object is fully visible within its own quadrant, no clipping, no shared platform, no outlines of cells, no text, no guides, no logos. Camera on every prop is slightly elevated oblique front view with a little right side visible; left and right props use the same perspective. Bold stepped 16-bit pixel-art outlines and visible square pixels, deliberate limited palette and subtle warm lighting, good silhouettes when displayed 40 pixels high. Transparent PNG with genuine alpha around each object and through open parts. No landscape, no room backdrop, no painted neutral background, no checkerboard, no people, no scene composition.
 
 </details>
+
+## 44. 투어 무대 도감 200종
+
+내장 imagegen으로 테마 10개에 각각 기본 구조 4개를 그렸다. 총 40개 구조에 기본, 라이브 리그, 네온, 등불, 피날레 세팅을 적용해 투명 무대 200종을 구성했다. 조명 골조, 무대 옆 기둥과 소품, 가랜드, 전면 장식은 4개 시트에 16개 부품으로 준비했다.
+
+| 테마 | 기본 구조 4종 | 도감과 공연에 쓰는 시트 | 원화 시트 |
+| --- | --- | --- | --- |
+| 골목과 광장 | 기와 정자, 벽돌 계단, 달문 정자, 골목 차양 | [PNG](../assets/stage-catalog/alley.png) | [PNG](art/stage-sources/alley.png) |
+| 항구와 해안 | 목재 부두, 파란 보트 창고, 컨테이너, 돛 그늘막 | [PNG](../assets/stage-catalog/coast.png) | [PNG](art/stage-sources/coast.png) |
+| 숲과 캠핑 | 통나무 오두막, 반원 데크, 삼각 보 구조, 숲속 천막 | [PNG](../assets/stage-catalog/forest.png) | [PNG](art/stage-sources/forest.png) |
+| 도심의 밤 | 네온 포털, 톱니 지붕, 도심 트러스, 지하철 캐노피 | [PNG](../assets/stage-catalog/metro.png) | [PNG](art/stage-sources/metro.png) |
+| 실내 라이브 | 붉은 커튼, 호두나무 스튜디오, 곡면 흡음벽, 공장 라이브홀 | [PNG](../assets/stage-catalog/hall.png) | [PNG](art/stage-sources/hall.png) |
+| 야시장과 축제 | 물결 천막, 쌍등탑, 붉은 누각, 팔각 광장 | [PNG](../assets/stage-catalog/festival.png) | [PNG](art/stage-sources/festival.png) |
+| 강변과 공원 | 강가 녹색 정자, 수변 산책로, 돌 계단 극장, 흰 곡선 지붕 | [PNG](../assets/stage-catalog/river.png) | [PNG](art/stage-sources/river.png) |
+| 겨울과 산길 | 눈 덮인 산장, 얼음 기둥, 겨울 원형 정자, 설원 트러스 | [PNG](../assets/stage-catalog/winter.png) | [PNG](art/stage-sources/winter.png) |
+| 개조 공연장 | 옛 전차 차고, 노출 콘크리트 갤러리, 라디오 스튜디오, 검은 소극장 | [PNG](../assets/stage-catalog/workshop.png) | [PNG](art/stage-sources/workshop.png) |
+| 랜드마크 | 고가 아래 아치, 언덕 전망대, 돌담 안마당, 바람 언덕 차양 | [PNG](../assets/stage-catalog/landmark.png) | [PNG](art/stage-sources/landmark.png) |
+
+공연 선택에서 ‘투어 48곳’을 연 뒤 ‘무대 도감’을 누르면 테마마다 20종을 볼 수 있다. 기존 투어 48곳에는 장소별 무대 1개씩을 배정하고, 선택 카드와 실제 공연에서 같은 무대를 보여준다. 기존 네 공연은 각각의 무대 이미지를 사용한다. 도감은 공연장이나 음원의 개수를 늘리지 않으며 투어 진행 및 기록과 별도로 전체를 열람할 수 있다.
+
+앱은 테마별로 4열×5행의 시트 10개를 포함한다. [Flutter 렌더러](../tool/render_stage_catalog_test.dart)를 `flutter test --no-pub tool/render_stage_catalog_test.dart`로 실행하면 시트와 개별 PNG 200개를 같은 구도로 렌더링한다. 개별 PNG는 `build/stage-catalog/`에 720×360 투명 이미지로 저장되며 한글 이름은 같은 폴더의 매니페스트에서 확인할 수 있다.
+
+장식 원화는 [조명 골조](art/stage-sources/rig.png), [무대 옆 소품](art/stage-sources/wing.png), [가랜드와 전면 장식](art/stage-sources/banner.png), [무대 옆 기둥](art/stage-sources/scenic.png) 시트에 있다.
+
+<details>
+<summary>내장 imagegen 프롬프트 14개</summary>
+
+**골목과 광장**
+
+> Asset type: pixel-art scene atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. This is an atlas of standalone, horizontally wide oblique concert stage structures with each solid structure wider than tall. Align every stage deck to the lower third of its own solid silhouette, top-lit, preserve a spacious clear and visibly walkable center deck for separate singer and guitarist sprites. Show no people, instruments, microphones, freestanding speakers, or audience. Do not paint anything outside the stage cutout, no sky or environment, no ground outside the deck. Use a clear contrasting palette for each structure within the shared theme. Theme: antique Korean neighborhood squares, warm amber, vermilion, indigo and dark wood.
+> top left: roofed hanok stage with black curving clay tiles, exposed vermilion beams.
+> top right: shallow terraced brick bandstand with a freestanding open wooden lantern portal.
+> bottom left: pale stone moon-gate pavilion around a wide timber deck.
+> bottom right: open raised alley platform under a striped indigo and cream awning.
+
+**항구와 해안**
+
+> Asset type: pixel-art scene atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. This is an atlas of standalone, horizontally wide oblique concert stage structures with each solid structure wider than tall. Align every stage deck to the lower third of its own solid silhouette, top-lit, preserve a spacious clear and visibly walkable center deck for separate singer and guitarist sprites. Show no people, instruments, microphones, freestanding speakers, or audience. Do not paint anything outside the stage cutout, no sky or environment, no ground outside the deck. Use a clear contrasting palette for each structure within the shared theme. Theme: Korean harbors, marine aquamarine, rope tan, buoy red and weathered blue wood.
+> top left: long jetty concert deck with two pier pilings and three warm festoon strings, no roof.
+> top right: compact old boathouse stage with a blue pitched corrugated roof and teal framing.
+> bottom left: container stage with orange industrial frame and teal open doors.
+> bottom right: broad open jetty stage with an asymmetric sailcloth canopy and short rails.
+
+**숲과 캠핑**
+
+> Asset type: pixel-art scene atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. This is an atlas of standalone, horizontally wide oblique concert stage structures with each solid structure wider than tall. Align every stage deck to the lower third of its own solid silhouette, top-lit, preserve a spacious clear and visibly walkable center deck for separate singer and guitarist sprites. Show no people, instruments, microphones, freestanding speakers, or audience. Do not paint anything outside the stage cutout, no sky or environment, no ground outside the deck. Use a clear contrasting palette for each structure within the shared theme. Theme: forest camp, pine green, cedar brown, moss, and autumn gold.
+> top left: log cabin bandstand with a steep pine shingle roof and rough-hewn posts.
+> top right: shallow semicircle wooden camp deck with an open back and a curved log edge.
+> bottom left: wide open A-frame stage with timber beams and a few warm square light fixtures.
+> bottom right: short square fern-green canvas canopy with broad wood deck and corner ropes.
+
+**도심의 밤**
+
+> Asset type: pixel-art scene atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. This is an atlas of standalone, horizontally wide oblique concert stage structures with each solid structure wider than tall. Align every stage deck to the lower third of its own solid silhouette, top-lit, preserve a spacious clear and visibly walkable center deck for separate singer and guitarist sprites. Show no people, instruments, microphones, freestanding speakers, or audience. Do not paint anything outside the stage cutout, no sky or environment, no ground outside the deck. Use a clear contrasting palette for each structure within the shared theme. Theme: late-night city, cyan and fuchsia lights, graphite steel, deep violet shadows.
+> top left: sleek rectangular neon portal stage on a dark deck with horizontal tube lights.
+> top right: shallow angular outdoor soundstage with an asymmetric sawtooth roof and cyan rim.
+> bottom left: open graphite rooftop truss concert platform with four small purple fixtures.
+> bottom right: rounded subway-inspired metal canopy above a wide low platform with amber rim lights.
+
+**실내 라이브**
+
+> Asset type: pixel-art scene atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. This is an atlas of standalone, horizontally wide oblique concert stage structures with each solid structure wider than tall. Align every stage deck to the lower third of its own solid silhouette, top-lit, preserve a spacious clear and visibly walkable center deck for separate singer and guitarist sprites. Show no people, instruments, microphones, freestanding speakers, or audience. Do not paint anything outside the stage cutout, no sky or environment, no ground outside the deck. Use a clear contrasting palette for each structure within the shared theme. Theme: Korean indie live halls, burgundy, cream, blackened steel and walnut.
+> top left: jewel-red curtain proscenium stage framed in dark wood and brass.
+> top right: acoustic walnut studio stage, partial rear slatted wall and stepped plaster wings.
+> bottom left: small club stage with two curved acoustic wings and open central backdrop.
+> bottom right: converted factory stage with riveted metal arch and cream marquee bulbs.
+
+**야시장과 축제**
+
+> Asset type: pixel-art scene atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. This is an atlas of standalone, horizontally wide oblique concert stage structures with each solid structure wider than tall. Align every stage deck to the lower third of its own solid silhouette, top-lit, preserve a spacious clear and visibly walkable center deck for separate singer and guitarist sprites. Show no people, instruments, microphones, freestanding speakers, or audience. Do not paint anything outside the stage cutout, no sky or environment, no ground outside the deck. Use a clear contrasting palette for each structure within the shared theme. Theme: festival and night market, apricot, vermilion, teal, creamy paper lantern tones.
+> top left: bright outdoor festival stage with scalloped peach fabric canopy.
+> top right: wide deck with two small latticed lantern towers and an open sky center.
+> bottom left: pagoda-inspired red roof bandstand with gold trim and teal pillars.
+> bottom right: open octagonal low festival platform with strings of folded pennants over the back.
+
+**강변과 공원**
+
+> Asset type: pixel-art scene atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. This is an atlas of standalone, horizontally wide oblique concert stage structures with each solid structure wider than tall. Align every stage deck to the lower third of its own solid silhouette, top-lit, preserve a spacious clear and visibly walkable center deck for separate singer and guitarist sprites. Show no people, instruments, microphones, freestanding speakers, or audience. Do not paint anything outside the stage cutout, no sky or environment, no ground outside the deck. Use a clear contrasting palette for each structure within the shared theme. Theme: Korean riverside parks, silver blue, warm white, jade and cobalt.
+> top left: waterfront pavilion deck with a shallow curved green roof on slim posts.
+> top right: simple open blue hour river boardwalk stage with a rail on its back edge.
+> bottom left: low stone amphitheater deck with soft cobalt trim and two layered terrace steps.
+> bottom right: raised jade deck under a thin white curved canopy with four warm fixtures.
+
+**겨울과 산길**
+
+> Asset type: pixel-art scene atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. This is an atlas of standalone, horizontally wide oblique concert stage structures with each solid structure wider than tall. Align every stage deck to the lower third of its own solid silhouette, top-lit, preserve a spacious clear and visibly walkable center deck for separate singer and guitarist sprites. Show no people, instruments, microphones, freestanding speakers, or audience. Do not paint anything outside the stage cutout, no sky or environment, no ground outside the deck. Use a clear contrasting palette for each structure within the shared theme. Theme: winter town, speckled snow, pale pink and deep blue twilight with amber lights.
+> top left: snow-dusted chalet stage with a broad dark blue pitched roof and cedar beams.
+> top right: open snow-edged concert deck with two blue ice-like corner pylons.
+> bottom left: round winter festival pavilion with pale ribbed roof and archways.
+> bottom right: chilly square outdoor truss stage with snow collecting on its red canopy.
+
+**개조 공연장**
+
+> Asset type: pixel-art scene atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. This is an atlas of standalone, horizontally wide oblique concert stage structures with each solid structure wider than tall. Align every stage deck to the lower third of its own solid silhouette, top-lit, preserve a spacious clear and visibly walkable center deck for separate singer and guitarist sprites. Show no people, instruments, microphones, freestanding speakers, or audience. Do not paint anything outside the stage cutout, no sky or environment, no ground outside the deck. Use a clear contrasting palette for each structure within the shared theme. Theme: Korean independent music venues in converted spaces, rich olive, rust, cream and midnight ink.
+> top left: converted tram-depot stage with dark railway beams and long warm lights.
+> top right: small art-gallery stage with exposed pale concrete portals and a cherry platform.
+> bottom left: open retro radio-studio stage with brown sound baffles and mint rail.
+> bottom right: black-box stage with a projecting hardwood platform and two saturated violet curtain wings.
+
+**랜드마크**
+
+> Asset type: pixel-art scene atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. This is an atlas of standalone, horizontally wide oblique concert stage structures with each solid structure wider than tall. Align every stage deck to the lower third of its own solid silhouette, top-lit, preserve a spacious clear and visibly walkable center deck for separate singer and guitarist sprites. Show no people, instruments, microphones, freestanding speakers, or audience. Do not paint anything outside the stage cutout, no sky or environment, no ground outside the deck. Use a clear contrasting palette for each structure within the shared theme. Theme: Korean city and countryside landmarks interpreted as original outdoor concert stages.
+> top left: underpass stage formed by a short dark viaduct arch with pale blue lamps.
+> top right: hilltop stone lookout stage with a low semicircular natural rock retaining wall.
+> bottom left: traditional courtyard stage framed with warm earthen pillars and a broad two-tier timber platform.
+> bottom right: windy promontory stage with triangular cream fabric shades and dusty coral deck.
+
+**조명 골조**
+
+> Asset type: pixel-art transparent stage dressing atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. Each cell contains one stage construction part, dry neutral illumination. No complete stage, no people, no scenery background and no common ground. Keep interior negative spaces truly transparent. Theme: stage lighting and production.
+> top left: industrial twin lighting truss frame, open middle, one horizontal upper crossbar with small amber square fixtures.
+> top right: matching pair of slim pale-teal LED towers linked by a narrow high straight light bar, huge transparent open middle.
+> bottom left: wide shallow proscenium with freestanding pink and purple neon outline and open middle.
+> bottom right: one connected freestanding arch of paper lanterns with thin dark metal side uprights, keep the middle transparent.
+
+**무대 옆 소품**
+
+> Asset type: pixel-art transparent stage dressing atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. Each cell contains one stage construction part, dry neutral illumination. No complete stage, no people, no scenery background and no common ground. Keep interior negative spaces truly transparent. Theme: stage side scenery.
+> top left: single squat wooden planter with tall fresh reeds, side scenery, blue-green.
+> top right: single squat stack of black production road cases with a short amber floodlight.
+> bottom left: one traditional red lantern and a dark timber post on a stone foot.
+> bottom right: single compact cyan spotlight on a small black side tower, amber core.
+
+**가랜드와 무대 전면 장식**
+
+> Asset type: pixel-art transparent stage dressing atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. Each cell contains one stage construction part, dry neutral illumination. No complete stage, no people, no scenery background and no common ground. Keep interior negative spaces truly transparent. Theme: stage festoons and floor edge detail.
+> top left: one slack curved string of colored triangular pennants, transparent interior and surround.
+> top right: one shallow-hanging string of six amber glowing bulbs with dark wire, transparent surround.
+> bottom left: one straight horizontal solid wood stage fascia with repeated geometric inlaid cream squares, no lettering.
+> bottom right: one long gold and indigo concert deck edging strip with repeating small solid glass lamps, front elevation.
+
+**무대 옆 기둥**
+
+> Asset type: pixel-art transparent stage dressing atlas. Four complete distinctly shaped illustrations in a strict equal 2 by 2 atlas. Each illustration fully inside its quadrant, with at least 8 percent completely empty transparent around all four sides of EVERY quadrant, and thick totally transparent center gutters. Reading order is left to right, top to bottom. No actual grid, boundaries, decorative separators, labels, text or logos. Genuine RGBA transparent background. Crisp authentic 16-bit pixel art for an original mobile Korean indie DJ concert game with hard square blocks, visible horizontal stair-steps, dark purple outline shadows, modest color palette, detailed only at strategic corners, no antialias haze. Front-on slightly raised three-quarter camera, mostly horizontal front edge with a little right side. Each cell contains one stage construction part, dry neutral illumination. No complete stage, no people, no scenery background and no common ground. Keep interior negative spaces truly transparent. Theme: bold stage wings and trim.
+> top left: one tall slim timber column with little folded cream festival flag to one side on at its top, freestanding.
+> top right: one tall blue and white architectural ice lantern plinth with glowing core, concert scenic wing.
+> bottom left: one squat copper and cream deco corner accent with ridged panels, concert scenic wing.
+> bottom right: one thick charcoal metal support tower with purple and magenta vertical strips, concert scenic wing.
+
+</details>
