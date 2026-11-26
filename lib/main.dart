@@ -630,6 +630,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   }
 
   void _selectZone(FestivalZone zone) {
+    if (_focusedZone == zone) return;
     setState(() => _focusedZone = zone);
   }
 
@@ -881,6 +882,8 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
   ZoneControlCard _volumeControl(FestivalZone zone) {
     final performance = _performance;
     final rehearsal = _rehearsalStep;
+    final selected = _focusedZone == zone;
+    final cue = _mixCue(zone);
     return ZoneControlCard(
       zone: zone == FestivalZone.front ? '앞줄' : '뒷줄',
       dialStyle: zone == FestivalZone.front
@@ -888,11 +891,13 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
           : VolumeDialStyle.back,
       status: performance.status(zone),
       volume: performance.volume(zone),
-      selected: _focusedZone == zone,
+      selected: selected,
       needsRescue: performance.needsRescue(zone),
+      onInteractionStart: () => _selectZone(zone),
       onVolumeChanged: (value) => _changeVolume(zone, value),
       target: performance.readyVolumeRange(zone),
-      cue: _mixCue(zone),
+      cue: cue,
+      showTarget: selected || (_focusedZone == null && cue == MixCue.adjust),
       enabled: rehearsal == null || rehearsal == _RehearsalStep.volume,
       onInteractionEnd: rehearsal == _RehearsalStep.volume
           ? _finishVolumePractice

@@ -58,6 +58,7 @@ enum VolumeDialStyle {
 
 const _dialStart = 3 * math.pi / 4;
 const _dialSweep = 3 * math.pi / 2;
+double _dialRadius(Size size) => size.shortestSide / 2 - 12;
 
 class CrowdStatusBadge extends StatelessWidget {
   const CrowdStatusBadge({
@@ -109,7 +110,10 @@ class ZoneVolumeSlider extends StatelessWidget {
     this.highlighted = false,
     this.vertical = false,
     this.dialStyle = VolumeDialStyle.front,
+    this.showDialTarget = false,
+    this.dialStatus = _mint,
     this.target,
+    this.onInteractionStart,
     this.onInteractionEnd,
   }) : assert(value >= 0 && value <= 100);
 
@@ -120,7 +124,10 @@ class ZoneVolumeSlider extends StatelessWidget {
   final bool highlighted;
   final bool vertical;
   final VolumeDialStyle dialStyle;
+  final bool showDialTarget;
+  final Color dialStatus;
   final ({int minimum, int maximum})? target;
+  final VoidCallback? onInteractionStart;
   final VoidCallback? onInteractionEnd;
 
   @override
@@ -128,6 +135,7 @@ class ZoneVolumeSlider extends StatelessWidget {
     final band = target;
     final step = vertical ? 1 : 5;
     void adjustBy(int delta) {
+      onInteractionStart?.call();
       onChanged((value + delta).clamp(0, 100));
       onInteractionEnd?.call();
     }
@@ -153,7 +161,10 @@ class ZoneVolumeSlider extends StatelessWidget {
                 value: value,
                 enabled: enabled,
                 style: dialStyle,
+                guide: enabled && showDialTarget ? band : null,
+                statusColor: dialStatus,
                 onChanged: onChanged,
+                onInteractionStart: onInteractionStart,
                 onInteractionEnd: onInteractionEnd,
               )
             : Column(
@@ -288,14 +299,20 @@ class _VolumeDialGesture extends StatefulWidget {
     required this.value,
     required this.enabled,
     required this.style,
+    required this.guide,
+    required this.statusColor,
     required this.onChanged,
+    required this.onInteractionStart,
     required this.onInteractionEnd,
   });
 
   final int value;
   final bool enabled;
   final VolumeDialStyle style;
+  final ({int minimum, int maximum})? guide;
+  final Color statusColor;
   final ValueChanged<int> onChanged;
+  final VoidCallback? onInteractionStart;
   final VoidCallback? onInteractionEnd;
 
   @override
@@ -313,6 +330,7 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
     final relative = details.localPosition - Offset(side / 2, side / 2);
     _dragValue = widget.value.toDouble();
     _turning = relative.distance >= side * .22;
+    widget.onInteractionStart?.call();
   }
 
   void _drag(DragUpdateDetails details, double side) {
@@ -347,6 +365,7 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
   }
 
   void _tap(TapUpDetails details, double height) {
+    widget.onInteractionStart?.call();
     final offset = details.localPosition.dy - height / 2;
     if (offset.abs() < 9) return;
     _update(widget.value + (offset < 0 ? 1 : -1));
@@ -397,6 +416,11 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
                   enabled: widget.enabled,
                   style: widget.style,
                 ),
+                foregroundPainter: _VolumeDialGuidePainter(
+                  value: widget.value,
+                  target: widget.guide,
+                  status: widget.statusColor,
+                ),
               ),
             ),
           ),
@@ -420,7 +444,7 @@ class _VolumeDialPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final origin = Offset(size.width / 2, size.height / 2);
-    final radius = size.shortestSide / 2 - 12;
+    final radius = _dialRadius(size);
     if (radius <= 12) return;
 
     final angle = _dialStart + _dialSweep * value / 100;
@@ -1018,6 +1042,8 @@ class ZoneControlCard extends StatelessWidget {
     required this.onVolumeChanged,
     required this.target,
     required this.cue,
+    required this.showTarget,
+    required this.onInteractionStart,
     this.enabled = true,
     this.onInteractionEnd,
     this.selected = false,
@@ -1031,6 +1057,8 @@ class ZoneControlCard extends StatelessWidget {
   final ValueChanged<int> onVolumeChanged;
   final ({int minimum, int maximum}) target;
   final MixCue cue;
+  final bool showTarget;
+  final VoidCallback onInteractionStart;
   final bool enabled;
   final VoidCallback? onInteractionEnd;
   final bool selected;
@@ -1039,17 +1067,7 @@ class ZoneControlCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textScaler = MediaQuery.textScalerOf(context);
-    final footerTextSize = textScaler.scale(11);
-    final stackFooter = footerTextSize > 14;
-    final footerLineHeight = footerTextSize * 1.5 + 6;
-    final statusBadge = CrowdStatusBadge(status: status, compact: true);
-    final goal = SizedBox(
-      width: stackFooter ? 102 : 72,
-      height: 14,
-      child: CustomPaint(
-        painter: _VolumeTargetPainter(value: volume, target: target),
-      ),
-    );
+    final footerLineHeight = textScaler.scale(11) * 1.5 + 6;
     return AspectRatio(
       aspectRatio: 1,
       child: Container(
@@ -1099,25 +1117,18 @@ class ZoneControlCard extends StatelessWidget {
                 target: target,
                 vertical: true,
                 dialStyle: dialStyle,
+                showDialTarget: showTarget,
+                dialStatus: status.color,
                 enabled: enabled,
+                onInteractionStart: onInteractionStart,
                 onInteractionEnd: onInteractionEnd,
               ),
             ),
             SizedBox(
-              height: stackFooter ? footerLineHeight + 18 : footerLineHeight,
+              height: footerLineHeight,
               child: FittedBox(
                 fit: BoxFit.scaleDown,
-                child: stackFooter
-                    ? Column(
-                        children: [
-                          statusBadge,
-                          const SizedBox(height: 4),
-                          goal,
-                        ],
-                      )
-                    : Row(
-                        children: [statusBadge, const SizedBox(width: 6), goal],
-                      ),
+                child: CrowdStatusBadge(status: status, compact: true),
               ),
             ),
           ],
@@ -1127,53 +1138,50 @@ class ZoneControlCard extends StatelessWidget {
   }
 }
 
-class _VolumeTargetPainter extends CustomPainter {
-  const _VolumeTargetPainter({required this.value, required this.target});
+class _VolumeDialGuidePainter extends CustomPainter {
+  const _VolumeDialGuidePainter({
+    required this.value,
+    required this.target,
+    required this.status,
+  });
 
   final int value;
-  final ({int minimum, int maximum}) target;
+  final ({int minimum, int maximum})? target;
+  final Color status;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = size.height / 2;
-    double position(int percent) => 4 + (size.width - 8) * percent / 100;
-
-    final track = RRect.fromRectAndRadius(
-      Rect.fromLTRB(position(0), center - 2, position(100), center + 2),
-      const Radius.circular(2),
+    final origin = Offset(size.width / 2, size.height / 2);
+    final radius = _dialRadius(size);
+    if (radius <= 12) return;
+    final band = target;
+    if (band == null) {
+      canvas.drawCircle(
+        origin.translate(0, -radius - 8),
+        2.5,
+        Paint()..color = status,
+      );
+      return;
+    }
+    canvas.drawArc(
+      Rect.fromCircle(center: origin, radius: radius),
+      _dialStart + _dialSweep * band.minimum / 100,
+      _dialSweep * (band.maximum - band.minimum) / 100,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..color = _mint,
     );
-    canvas.drawRRect(track, Paint()..color = _line);
-
-    final band = RRect.fromRectAndRadius(
-      Rect.fromLTRB(
-        position(target.minimum),
-        center - 3,
-        position(target.maximum),
-        center + 3,
-      ),
-      const Radius.circular(2),
-    );
-    canvas.drawRRect(band, Paint()..color = _mint);
-
-    final pointer = position(value);
-    final marker = Path()
-      ..moveTo(pointer, center - 4.5)
-      ..lineTo(pointer + 3, center)
-      ..lineTo(pointer, center + 4.5)
-      ..lineTo(pointer - 3, center)
-      ..close();
-    canvas
-      ..drawPath(
-        marker,
-        Paint()
-          ..color = const Color(0xFF171525)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2,
-      )
-      ..drawPath(marker, Paint()..color = _ink);
+    final angle = _dialStart + _dialSweep * value / 100;
+    final pointer = origin + Offset(math.cos(angle), math.sin(angle)) * radius;
+    canvas.drawCircle(pointer, 2.3, Paint()..color = _ink);
   }
 
   @override
-  bool shouldRepaint(covariant _VolumeTargetPainter oldDelegate) =>
-      value != oldDelegate.value || target != oldDelegate.target;
+  bool shouldRepaint(covariant _VolumeDialGuidePainter oldDelegate) =>
+      target != oldDelegate.target ||
+      (target == null
+          ? status != oldDelegate.status
+          : value != oldDelegate.value);
 }

@@ -157,30 +157,34 @@ void main() {
     await tester.pumpAndSettle();
 
     final sliders = find.byType(ZoneVolumeSlider);
-    CustomPainter dial(Finder slider) => tester
-        .widget<CustomPaint>(
-          find.descendant(
-            of: _dialGesture(slider),
-            matching: find.byType(CustomPaint),
-          ),
-        )
-        .painter!;
+    CustomPaint dial(Finder slider) => tester.widget<CustomPaint>(
+      find.descendant(
+        of: _dialGesture(slider),
+        matching: find.byType(CustomPaint),
+      ),
+    );
     final frontBefore = dial(sliders.first);
     final rearBefore = dial(sliders.last);
     final frontBounds = tester.getRect(_dialGesture(sliders.first));
-    final frontTrack = find
-        .descendant(
-          of: find.byType(ZoneControlCard).first,
-          matching: find.byType(CustomPaint),
-        )
-        .last;
-    final guideBefore = tester.widget<CustomPaint>(frontTrack).painter!;
     expect(tester.widget<ZoneVolumeSlider>(sliders.first).target, (
       minimum: 48,
       maximum: 60,
     ));
 
-    await tester.drag(_dialGesture(sliders.last), const Offset(0, 120));
+    await tester.drag(_dialGesture(sliders.last), const Offset(0, -60));
+    await tester.pump();
+    expect(tester.widget<ZoneVolumeSlider>(sliders.last).value, 60);
+    expect(tester.widget<ZoneVolumeSlider>(sliders.first).target, (
+      minimum: 44,
+      maximum: 56,
+    ));
+    expect(
+      dial(sliders.first).foregroundPainter!
+          .shouldRepaint(frontBefore.foregroundPainter!),
+      isFalse,
+    );
+
+    await tester.drag(_dialGesture(sliders.last), const Offset(0, 180));
     await tester.pump();
     expect(tester.widget<ZoneVolumeSlider>(sliders.first).value, 50);
     expect(tester.widget<ZoneVolumeSlider>(sliders.last).value, 0);
@@ -196,16 +200,24 @@ void main() {
           .value,
       '50%, 준비 구간 56%에서 68%',
     );
+    expect(tester.getRect(_dialGesture(sliders.first)), frontBounds);
     expect(
-      tester
-          .widget<CustomPaint>(frontTrack)
-          .painter!
-          .shouldRepaint(guideBefore),
+      dial(sliders.first).painter!.shouldRepaint(frontBefore.painter!),
+      isFalse,
+    );
+    expect(
+      dial(sliders.last).painter!.shouldRepaint(rearBefore.painter!),
       isTrue,
     );
-    expect(tester.getRect(_dialGesture(sliders.first)), frontBounds);
-    expect(dial(sliders.first).shouldRepaint(frontBefore), isFalse);
-    expect(dial(sliders.last).shouldRepaint(rearBefore), isTrue);
+
+    final inactive = dial(sliders.first).foregroundPainter!;
+    await tester.tap(_dialGesture(sliders.first));
+    await tester.pump();
+    expect(tester.widget<ZoneVolumeSlider>(sliders.first).value, 50);
+    expect(
+      dial(sliders.first).foregroundPainter!.shouldRepaint(inactive),
+      isTrue,
+    );
   });
 
   testWidgets('Combo reconnect animates in place and respects reduced motion', (
