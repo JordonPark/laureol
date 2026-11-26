@@ -6,6 +6,8 @@ import 'package:flutter/widgets.dart';
 import 'festival_performance.dart';
 import 'performance_controls.dart';
 
+part 'festival_interior.dart';
+
 double _sceneY(double y, bool compact) {
   if (!compact) return y;
   if (y <= 178) return y * (135 / 178);
@@ -45,7 +47,6 @@ enum _Sprite {
     887,
     Rect.fromLTRB(8, 307, 1756, 844),
   ),
-  backdrop('festival/backdrop', 1774, 887, Rect.fromLTRB(241, 39, 1532, 879)),
   speaker('festival/speaker', 1774, 887, Rect.fromLTRB(619, 11, 1148, 876)),
   lighting('festival/lighting', 1774, 887, Rect.fromLTRB(625, 18, 1128, 882)),
   truck('festival/food-truck', 1774, 887, Rect.fromLTRB(273, 13, 1485, 876)),
@@ -224,30 +225,72 @@ class FestivalScene extends StatefulWidget {
 
 class _FestivalSceneState extends State<FestivalScene> {
   final _images = <_Sprite, ui.Image>{};
+  ui.Image? _interior;
   bool _failed = false;
 
   @override
   void initState() {
     super.initState();
     _loadSprites();
+    _loadInterior(_interiorRegion(widget.venue));
+  }
+
+  @override
+  void didUpdateWidget(covariant FestivalScene oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final region = _interiorRegion(widget.venue);
+    if (region == _interiorRegion(oldWidget.venue)) return;
+    _interior?.dispose();
+    _interior = null;
+    _loadInterior(region);
+  }
+
+  Future<ui.Image> _decode(String asset, int width) async {
+    final bytes = await rootBundle.load(asset);
+    final codec = await ui.instantiateImageCodec(
+      bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
+      targetWidth: width,
+    );
+    try {
+      return (await codec.getNextFrame()).image;
+    } finally {
+      codec.dispose();
+    }
   }
 
   Future<void> _loadSprite(_Sprite sprite) async {
-    final bytes = await rootBundle.load('docs/art/${sprite.path}.png');
-    if (!mounted) return;
-    final codec = await ui.instantiateImageCodec(
-      bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
-      targetWidth: sprite.animated ? 864 : 480,
+    final image = await _decode(
+      'docs/art/${sprite.path}.png',
+      sprite.animated ? 864 : 480,
     );
+    if (mounted) {
+      _images[sprite] = image;
+    } else {
+      image.dispose();
+    }
+  }
+
+  Future<void> _loadInterior(TourRegion region) async {
     try {
-      final image = (await codec.getNextFrame()).image;
-      if (!mounted) {
+      final image = await _decode(
+        'docs/art/festival/interior-${region.name}.png',
+        768,
+      );
+      if (!mounted || region != _interiorRegion(widget.venue)) {
         image.dispose();
         return;
       }
-      _images[sprite] = image;
-    } finally {
-      codec.dispose();
+      final previous = _interior;
+      setState(() => _interior = image);
+      previous?.dispose();
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'festival interior',
+        ),
+      );
     }
   }
 
@@ -269,6 +312,7 @@ class _FestivalSceneState extends State<FestivalScene> {
 
   @override
   void dispose() {
+    _interior?.dispose();
     for (final image in _images.values) {
       image.dispose();
     }
@@ -315,6 +359,7 @@ class _FestivalSceneState extends State<FestivalScene> {
                       builder: (context, progress, _) => CustomPaint(
                         painter: _FestivalPainter(
                           images: _images,
+                          interior: _interior,
                           tick: widget.tick,
                           front: widget.front,
                           back: widget.back,
@@ -599,6 +644,7 @@ class _ComboWavePainter extends CustomPainter {
 class _FestivalPainter extends CustomPainter {
   _FestivalPainter({
     required Map<_Sprite, ui.Image> images,
+    required this.interior,
     required this.tick,
     required this.front,
     required this.back,
@@ -618,9 +664,12 @@ class _FestivalPainter extends CustomPainter {
     required this.pulseProgress,
     required this.activeMixZone,
     required this.reducedMotion,
-  }) : images = Map.of(images);
+  }) : images = Map.of(images),
+       interiorRegion = _interiorRegion(venue);
 
   final Map<_Sprite, ui.Image> images;
+  final ui.Image? interior;
+  final TourRegion interiorRegion;
   final int tick;
   final CrowdStatus front;
   final CrowdStatus back;
@@ -1015,17 +1064,6 @@ class _FestivalPainter extends CustomPainter {
         tint: tinted,
       );
     }
-    if (form == TourStage.canopy || form == TourStage.deck) {
-      _draw(canvas, _Sprite.backdrop, const Offset(52, 151), 46, tint: tinted);
-      _draw(
-        canvas,
-        _Sprite.backdrop,
-        const Offset(278, 149),
-        44,
-        mirror: true,
-        tint: tinted,
-      );
-    }
     _draw(canvas, sprite, const Offset(172, 178), height, tint: tinted);
 
     // Stage-edge lights use the venue's palette and a stable fixture spacing.
@@ -1082,6 +1120,7 @@ class _FestivalPainter extends CustomPainter {
         _ => venue.region == null ? null : Color(venue.region!.ground),
       },
     );
+    _drawInteriorFloor(canvas);
     final frontFocused = focusedZone == FestivalZone.front;
     final backFocused = focusedZone == FestivalZone.back;
     if (frontFocused || frontCue != MixCue.none) {
@@ -1090,11 +1129,10 @@ class _FestivalPainter extends CustomPainter {
     if (backFocused || backCue != MixCue.none) {
       _highlightAudience(canvas, false, _zoneColor(backCue, back.color));
     }
+    _drawInteriorProps(canvas, floor: false);
     if (venue.stage case final style?) {
       _drawTourStage(canvas, style);
     } else if (outdoorFestival) {
-      _draw(canvas, _Sprite.backdrop, const Offset(70, 123), 65);
-      _draw(canvas, _Sprite.backdrop, const Offset(292, 123), 58, mirror: true);
       _draw(canvas, _Sprite.lighting, const Offset(39, 154), 103);
       _draw(canvas, _Sprite.stage, const Offset(167, 178), 170);
     } else {
@@ -1123,6 +1161,7 @@ class _FestivalPainter extends CustomPainter {
     if (outdoorFestival) {
       _draw(canvas, _Sprite.truck, const Offset(295, 242), 88);
     }
+    _drawInteriorProps(canvas, floor: true);
 
     final wave = waveFrame;
     if (wave != null) {
@@ -1229,6 +1268,7 @@ class _FestivalPainter extends CustomPainter {
       backCue != oldDelegate.backCue ||
       readyZones != oldDelegate.readyZones ||
       pulseProgress != oldDelegate.pulseProgress ||
+      interior != oldDelegate.interior ||
       activeMixZone != oldDelegate.activeMixZone ||
       reducedMotion != oldDelegate.reducedMotion ||
       venue != oldDelegate.venue ||
