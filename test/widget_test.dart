@@ -28,6 +28,46 @@ void main() {
   });
 
   testWidgets(
+    'Tour opens a region, plays a venue, and reflects its saved result',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 740));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(LaureolApp(records: records));
+
+      for (final label in ['공연 시작', '투어 48곳', '골목과 광장', '우체국 앞 작은광장 시작']) {
+        final target = find.text(label);
+        expect(target.hitTestable(), findsOneWidget);
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+      }
+
+      FestivalScene scene() => tester.widget(find.byType(FestivalScene));
+      expect(scene().venue, TourRegion.alley.venues.first);
+      final rear = _dialGesture(find.byType(ZoneVolumeSlider).last);
+      await tester.drag(rear, const Offset(0, -30));
+      await tester.pump();
+      await tester.tap(find.text('시작'));
+      await tester.pump();
+      await tester.pump(festivalTick * (736 - scene().tick));
+      await tester.pumpAndSettle();
+      expect(find.text('전체 결과'), findsOneWidget);
+      final next = find.bySemanticsLabel('다음 무대 · 은행나무 삼거리');
+      await tester.tap(next);
+      await tester.pumpAndSettle();
+      expect(scene().venue, TourRegion.alley.venues.elementAt(1));
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      final best = records.bestFor(TourRegion.alley.venues.first);
+      expect(best, isNotNull);
+      expect(find.text('최고 ${best!.score}/90'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 6 공연 완료'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'An existing market record leads through the club to the rooftop',
     (tester) async {
       final festival = FestivalPerformance()

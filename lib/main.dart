@@ -410,7 +410,7 @@ class _SelectionScreenState extends State<_SelectionScreen> {
     final best = widget.records.concertBest;
     final masteryBest = widget.records.masteryBest;
     final cards = [
-      for (final venue in FestivalVenue.values)
+      for (final venue in FestivalVenue.originals)
         VenueCard(
           venue: venue,
           artHeight: compact ? 144 : 158,
@@ -425,23 +425,13 @@ class _SelectionScreenState extends State<_SelectionScreen> {
       title: '공연 선택',
       compact: compact,
       maxWidth: sideBySide ? 900 : 520,
+      trailing: CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: () => _open(context, _TourScreen(records: widget.records)),
+        child: Text('투어 ${FestivalVenue.tourVenues.length}곳'),
+      ),
       children: [
-        if (sideBySide)
-          for (var index = 0; index < cards.length; index += 2)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: cards[index]),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: index + 1 < cards.length
-                      ? cards[index + 1]
-                      : const SizedBox.shrink(),
-                ),
-              ],
-            )
-        else
-          ...cards,
+        ..._cardRows(cards, paired: sideBySide),
         Wrap(
           spacing: 8,
           runSpacing: 6,
@@ -462,6 +452,174 @@ class _SelectionScreenState extends State<_SelectionScreen> {
           ],
         ),
       ],
+    );
+  }
+}
+
+List<Widget> _cardRows(List<Widget> cards, {required bool paired}) {
+  if (!paired) return cards;
+  return [
+    for (var index = 0; index < cards.length; index += 2)
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: cards[index]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: index + 1 < cards.length
+                ? cards[index + 1]
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+  ];
+}
+
+class _TourScreen extends StatelessWidget {
+  const _TourScreen({required this.records});
+
+  final FestivalRecords records;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: records,
+    builder: (context, _) => LayoutBuilder(builder: _build),
+  );
+
+  Widget _build(BuildContext context, BoxConstraints bounds) {
+    final wide = bounds.maxWidth >= 620;
+    final grid =
+        bounds.maxWidth - MediaQuery.paddingOf(context).horizontal >= 360 &&
+        MediaQuery.textScalerOf(context).scale(20) <= 23;
+    final cards = [
+      for (final region in TourRegion.values)
+        _regionCard(context, region, grid),
+    ];
+    return _Screen(
+      title: '공연 투어',
+      compact: bounds.maxHeight < 480,
+      maxWidth: wide ? 880 : 520,
+      children: _cardRows(cards, paired: grid),
+    );
+  }
+
+  Widget _regionCard(BuildContext context, TourRegion region, bool grid) {
+    final completed = region.venues
+        .where((venue) => records.bestFor(venue) != null)
+        .length;
+    final total = region.venues.length;
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      onPressed: () =>
+          _open(context, _TourRegionScreen(records: records, region: region)),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        constraints: BoxConstraints(minHeight: grid ? 116 : 82),
+        decoration: BoxDecoration(
+          color: const Color(0xFF252037),
+          border: Border.all(color: Color(region.accent).withAlpha(115)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                region.backdrop,
+                fit: BoxFit.cover,
+                cacheWidth: 768,
+                excludeFromSemantics: true,
+              ),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: grid ? Alignment.topCenter : Alignment.centerLeft,
+                    end: grid ? Alignment.bottomCenter : Alignment.centerRight,
+                    colors: grid
+                        ? const [Color(0x12171329), Color(0xF2171329)]
+                        : const [Color(0xF2171329), Color(0x60171329)],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          region.title,
+                          style: const TextStyle(
+                            color: _paper,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$completed / $total 공연 완료',
+                          style: TextStyle(
+                            color: Color(region.accent),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    CupertinoIcons.chevron_right,
+                    color: _paper,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TourRegionScreen extends StatelessWidget {
+  const _TourRegionScreen({required this.records, required this.region});
+
+  final FestivalRecords records;
+  final TourRegion region;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: records,
+    builder: (context, _) => LayoutBuilder(builder: _build),
+  );
+
+  Widget _build(BuildContext context, BoxConstraints bounds) {
+    final wide = bounds.maxWidth >= 620;
+    final compact = bounds.maxHeight < 480;
+    final cards = [
+      for (final venue in region.venues)
+        VenueCard(
+          venue: venue,
+          artHeight: compact ? 112 : 141,
+          best: records.bestFor(venue)?.score,
+          missionCompleted: records.missionCompleted(venue),
+          onPlay: () => _open(
+            context,
+            _PerformanceScreen(records: records, venue: venue),
+          ),
+        ),
+    ];
+    return _Screen(
+      title: region.title,
+      previousPageTitle: '투어',
+      compact: compact,
+      maxWidth: wide ? 880 : 520,
+      children: _cardRows(cards, paired: wide),
     );
   }
 }
@@ -1418,7 +1576,11 @@ class _ResultsScreenState extends State<_ResultsScreen> {
     );
     return _Screen(
       title: '전체 결과',
-      previousPageTitle: widget.returnHome ? '시작 화면' : '공연 선택',
+      previousPageTitle: widget.returnHome
+          ? '시작 화면'
+          : venue.region == null
+          ? '공연 선택'
+          : '공연장',
       compact: compact,
       maxWidth: wide ? 880 : 520,
       footer: _ResultActions(
@@ -1671,11 +1833,9 @@ class _ResultsHero extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.asset(
-                    venue.posterAsset,
-                    fit: BoxFit.cover,
+                  VenueArtwork(
+                    venue: venue,
                     alignment: const Alignment(0, .12),
-                    excludeFromSemantics: true,
                   ),
                   const DecoratedBox(
                     decoration: BoxDecoration(

@@ -9,6 +9,71 @@ void _at(FestivalPerformance performance, double seconds) {
 }
 
 void main() {
+  test('All 48 tour charts are distinct, finish, and have achievable goals', () {
+    expect(FestivalVenue.values, hasLength(52));
+    expect(
+      FestivalVenue.values.map((venue) => venue.name).toSet(),
+      hasLength(52),
+    );
+    final charts = <String>{};
+    var totalPlayed = 0;
+    for (final region in TourRegion.values) {
+      expect(region.venues, hasLength(6));
+      expect(region.venues.last.next, isNull);
+      for (final venue in region.venues) {
+        final changes = venue.buildMixChanges();
+        final timing = changes
+            .map(
+              (change) => (change.zone, change.start, change.end, change.gain),
+            )
+            .join('|');
+        expect(charts.add(timing), isTrue, reason: venue.title);
+        final performance = FestivalPerformance(
+          venue: venue,
+          signalTiming: math.Random(venue.chart),
+        )..startMainConcert();
+        while (!performance.finished) {
+          for (final zone in FestivalZone.values) {
+            final target = performance.readyVolumeRange(zone);
+            final volume = performance.volume(zone);
+            if (volume < target.minimum || volume > target.maximum) {
+              performance.setVolume(
+                zone,
+                (target.minimum + target.maximum) ~/ 2,
+              );
+            }
+          }
+          if (performance.recommendedSignalZone case final zone?) {
+            performance.queue(zone);
+          }
+          performance.advanceTicks(1);
+          performance.advancePastInterlude();
+          totalPlayed++;
+        }
+        expect(
+          performance.missionAchieved,
+          isTrue,
+          reason:
+              '${venue.title} ${performance.score}/90, ${performance.bestCombo} combo',
+        );
+        expect(
+          performance.score,
+          inInclusiveRange(65, 90),
+          reason: venue.title,
+        );
+        for (var chorus = 1; chorus <= 3; chorus++) {
+          expect(
+            performance.chorusResult(chorus).beatCount,
+            20,
+            reason: venue.title,
+          );
+        }
+      }
+    }
+    expect(charts, hasLength(48));
+    expect((festivalTick * totalPlayed).inMinutes, inInclusiveRange(40, 50));
+  });
+
   test('Signal openings vary and survive a saved chorus replay', () {
     final performance = FestivalPerformance(signalTiming: math.Random(19));
     const front = FestivalZone.front;

@@ -23,18 +23,26 @@ class VenueCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locked = onPlay == null;
-    final accent = switch (venue) {
-      FestivalVenue.neighborhood => const Color(0xFFFFC46A),
-      FestivalVenue.nightMarket => const Color(0xFF7CE0C2),
-      FestivalVenue.liveClub => const Color(0xFFF1A6F3),
-      FestivalVenue.rooftop => const Color(0xFF8FCDFF),
-    };
-    final objective = Text(
-      locked ? venue.unlockHint ?? venue.mission : venue.mission,
-      style: TextStyle(
-        color: locked ? const Color(0xFFBDB8CD) : accent,
-        fontSize: 13,
-      ),
+    final accent = Color(venue.accent);
+    final objective = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (venue.description case final description?)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              description,
+              style: const TextStyle(color: Color(0xFFF7F2FF), fontSize: 13),
+            ),
+          ),
+        Text(
+          locked ? venue.unlockHint ?? venue.mission : venue.mission,
+          style: TextStyle(
+            color: locked ? const Color(0xFFBDB8CD) : accent,
+            fontSize: 13,
+          ),
+        ),
+      ],
     );
     final start = CupertinoButton(
       color: accent,
@@ -65,12 +73,7 @@ class VenueCard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.asset(
-                  venue.posterAsset,
-                  fit: BoxFit.cover,
-                  alignment: const Alignment(0, .18),
-                  excludeFromSemantics: true,
-                ),
+                VenueArtwork(venue: venue),
                 DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -154,6 +157,62 @@ class VenueCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class VenueArtwork extends StatelessWidget {
+  const VenueArtwork({
+    super.key,
+    required this.venue,
+    this.alignment = const Alignment(0, .18),
+  });
+
+  final FestivalVenue venue;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final stage = switch (venue.stage) {
+      TourStage.canopy => 'stage.png',
+      TourStage.theatre => 'stage-club.png',
+      TourStage.deck => 'stage-rooftop.png',
+      TourStage.studio => 'stage-tour-studio.png',
+      TourStage.rig => 'stage-tour-rig.png',
+      TourStage.arena => 'stage-tour-arena.png',
+      null => null,
+    };
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          venue.posterAsset,
+          fit: BoxFit.cover,
+          cacheWidth: venue.region == null ? null : 768,
+          alignment: alignment,
+          excludeFromSemantics: true,
+        ),
+        if (stage != null)
+          Align(
+            alignment: const Alignment(.90, .63),
+            child: FractionallySizedBox(
+              widthFactor: venue.stage == TourStage.arena ? .68 : .58,
+              heightFactor: .96,
+              child: Image.asset(
+                'docs/art/festival/$stage',
+                color: Color.lerp(
+                  const Color(0xFFFFFFFF),
+                  Color(venue.accent),
+                  .25,
+                ),
+                colorBlendMode: BlendMode.modulate,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.none,
+                excludeFromSemantics: true,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

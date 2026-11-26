@@ -6,6 +6,38 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test(
+    'Tour records stay independent across venues and keep the highest score',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final records = FestivalRecords(preferences);
+      final first = TourRegion.alley.venues.first;
+      final second = first.next!;
+      expect(records.isUnlocked(second), isTrue);
+      final strong = FestivalPerformance(venue: first)
+        ..startMainConcert()
+        ..setVolume(FestivalZone.back, 50)
+        ..advanceTicks(576);
+      final weak = FestivalPerformance(venue: first)..advanceTicks(736);
+      final another = FestivalPerformance(venue: second)..advanceTicks(736);
+      expect(strong.score, greaterThan(weak.score));
+      expect(
+        await Future.wait([
+          records.record(strong),
+          records.record(weak),
+          records.record(another),
+        ]),
+        [true, true, true],
+      );
+      await preferences.reload();
+      final reloaded = FestivalRecords(preferences);
+      expect(reloaded.bestFor(first)?.score, strong.score);
+      expect(reloaded.bestFor(second)?.score, another.score);
+      expect(reloaded.concertBest, isNull);
+    },
+  );
+
+  test(
     'Completing the audience goal unlocks a separate night market record',
     () async {
       SharedPreferences.setMockInitialValues({});

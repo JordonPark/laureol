@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 
+import 'festival_venues.dart';
 import 'performance_controls.dart';
+
+export 'festival_venues.dart';
 
 const festivalTick = Duration(milliseconds: 125);
 const _ticksPerBeat = 4;
@@ -22,82 +25,20 @@ const _rewindTicks = 3 * _ticksPerSecond;
 const _maxEarlySignalBeats = 3;
 const comboEffectTicks = 12;
 
-enum FestivalZone { front, back }
-
 enum FestivalCue { call, applause, singalong, generatorStop }
 
-enum FestivalVenue {
-  neighborhood(
-    '동네 축제',
-    '두 줄이 8박 연속 떼창하기',
-    'venue-neighborhood.png',
-    'festival-first-show.wav',
-  ),
-  nightMarket(
-    '야외 야시장',
-    '발전기가 꺼진 뒤 4박 안에 두 줄 합류시키기',
-    'venue-market.png',
-    'night-market-step.wav',
-  ),
-  liveClub(
-    '지하 라이브클럽',
-    '마지막 후렴에서 두 줄이 함께 12박 떼창하기',
-    'venue-club.png',
-    'neon-break.wav',
-  ),
-  rooftop(
-    '옥상 공연',
-    '세 후렴 모두에서 두 줄이 함께 떼창하기',
-    'venue-rooftop.png',
-    'rooftop-encore.wav',
-  );
-
-  const FestivalVenue(this.title, this.mission, this.poster, this.musicAsset);
-
-  final String title;
-  final String mission;
-  final String poster;
-  final String musicAsset;
-
-  String get posterAsset => 'docs/art/festival/$poster';
-
-  bool get usesGenerator => this == neighborhood || this == nightMarket;
-
-  FestivalVenue? get next =>
-      index + 1 < values.length ? values[index + 1] : null;
-
-  String? get unlockHint => switch (this) {
-    neighborhood => null,
-    nightMarket => '동네 축제에서 두 줄 8박 연속 떼창으로 해금',
-    liveClub => '야외 야시장 완주로 해금',
-    rooftop => '지하 라이브클럽 완주로 해금',
-  };
-}
-
-class _MixChange {
-  const _MixChange(this.label, this.zone, this.start, this.end, this.gain);
-
-  final String label;
-  final FestivalZone zone;
-  final int start;
-  final int end;
-  final int gain;
-
-  bool activeAt(int second) => second >= start && second < end;
-}
-
 const _clubChanges = [
-  _MixChange('앞줄 모니터 증폭', FestivalZone.front, 23, 28, 16),
-  _MixChange('뒷벽 저음 반사', FestivalZone.back, 48, 56, 16),
-  _MixChange('앞줄 스피커 감쇠', FestivalZone.front, 76, 82, -16),
-  _MixChange('뒷줄 스피커 감쇠', FestivalZone.back, 85, 89, -16),
+  FestivalMixChange('앞줄 모니터 증폭', FestivalZone.front, 23, 28, 16),
+  FestivalMixChange('뒷벽 저음 반사', FestivalZone.back, 48, 56, 16),
+  FestivalMixChange('앞줄 스피커 감쇠', FestivalZone.front, 76, 82, -16),
+  FestivalMixChange('뒷줄 스피커 감쇠', FestivalZone.back, 85, 89, -16),
 ];
 
 const _rooftopChanges = [
-  _MixChange('뒷줄에 맞바람', FestivalZone.back, 23, 29, -14),
-  _MixChange('앞줄에 맞바람', FestivalZone.front, 47, 56, -14),
-  _MixChange('뒷줄에 돌풍', FestivalZone.back, 76, 82, -16),
-  _MixChange('앞줄에 돌풍', FestivalZone.front, 85, 89, -16),
+  FestivalMixChange('뒷줄에 맞바람', FestivalZone.back, 23, 29, -14),
+  FestivalMixChange('앞줄에 맞바람', FestivalZone.front, 47, 56, -14),
+  FestivalMixChange('뒷줄에 돌풍', FestivalZone.back, 76, 82, -16),
+  FestivalMixChange('앞줄에 돌풍', FestivalZone.front, 85, 89, -16),
 ];
 
 String _missingLabel(int mask) => switch (mask) {
@@ -324,10 +265,10 @@ class FestivalPerformance {
   final bool preserveRehearsalMix;
   final FestivalVenue venue;
   final ComboBreak? recovery;
-  List<_MixChange> get _mixChanges => switch (venue) {
+  late final List<FestivalMixChange> _mixChanges = switch (venue) {
     FestivalVenue.liveClub => _clubChanges,
     FestivalVenue.rooftop => _rooftopChanges,
-    _ => const [],
+    _ => venue.buildMixChanges(),
   };
   int get _generatorEnd =>
       _generatorStopTick +
@@ -393,7 +334,24 @@ class FestivalPerformance {
     FestivalVenue.liveClub =>
       _chorusBeats.last.where((beat) => beat == 3).length >= 12,
     FestivalVenue.rooftop => _chorusBeats.every((beats) => beats.contains(3)),
+    _ => _tourGoalReached,
   };
+
+  bool get _tourGoalReached {
+    final goal = venue.tourGoal;
+    return switch (goal) {
+      TourGoal.together => _bestTogetherStreak >= goal.target,
+      TourGoal.points => score >= goal.target,
+      TourGoal.combo => bestCombo >= goal.target,
+      TourGoal.everyChorus => _chorusBeats.every(
+        (beats) => beats.where((beat) => beat == 3).length >= goal.target,
+      ),
+      TourGoal.finale =>
+        _chorusBeats.last.where((beat) => beat == 3).length >= goal.target,
+      TourGoal.headliner => score >= goal.target && bestCombo >= 20,
+    };
+  }
+
   int get rescueBeats => _rescueUntil == null
       ? 0
       : (_rescueUntil! - _tick + _ticksPerBeat - 1) ~/ _ticksPerBeat;
@@ -769,6 +727,13 @@ class FestivalPerformance {
     const front = FestivalZone.front;
     const back = FestivalZone.back;
     if (signal(front) != SignalState.available) return null;
+    final chorus = _chorusAt(_tick);
+    if (venue.region != null && chorus != null && chorus.number > 0) {
+      final preferred = venue.preferredTourLead(chorus.number);
+      if (_levels[preferred.index] == CrowdStatus.ready) return preferred;
+      final other = FestivalZone.values[1 - preferred.index];
+      return _levels[other.index] == CrowdStatus.ready ? other : null;
+    }
     if (startsBothRows(back) || _levels[front.index] != CrowdStatus.ready) {
       return _levels[back.index] == CrowdStatus.ready ? back : null;
     }

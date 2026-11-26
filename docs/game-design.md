@@ -906,3 +906,78 @@
 > Use case: stylized-concept. Asset type: isolated in-game environment sprite, true transparent PNG. A single 2.5D pixel-art rooftop music deck as a standalone prop. Straight-on slightly elevated camera with a little of the RIGHT side visible and the front edge nearly horizontal. Wide low amber wooden stage platform with its two shallow front stairs, teal support trim, a mid-height navy blue metal roof railing behind it, two thin rear posts stringing a row of glowing peach bulbs between them, two planters tucked into the rear corners. Open top, open air, no canopy, no ceiling. Keep the broad stage floor empty and uncluttered so two separate sprite performers can later stand on it. All corners included, generous 3-5 percent margin. One whole connected cutout only, clear bold square 16-bit pixel clusters, crisp stepped edges, limited Teal and Amber palette, no gradients or painterly shading. Do not include people, an audience, signs, music instruments, microphones, equipment, a building, a skyline, an outside floor, text, or watermark. Transparent background outside the single prop; landscape 4:3.
 
 </details>
+
+## 42. 전국 공연 투어와 52개 공연장
+
+공연 선택 오른쪽 위의 **투어 48곳**에서 여덟 지역을 골라요. 각 지역에는 바로 시작할 수 있는 공연장 여섯 곳이 있어요. 기존 동네 축제, 야외 야시장, 지하 라이브클럽, 옥상 공연까지 총 **52곳**이에요. 지역 목록에 완주한 공연 수를 표시하고, 각 공연 카드에 최고점과 목표 달성을 표시해요. 지역의 마지막 공연까지 결과에서 다음 공연으로 이어갈 수 있어요.
+
+| 지역 | 공연장 여섯 곳 | 지역 반주 | 배경 원화 |
+| --- | --- | --- | --- |
+| 골목과 광장 | 우체국 앞 작은광장 · 은행나무 삼거리 · 헌책방 골목 · 오락실 지하광장 · 기와마당 · 옛 역전광장 | [골목 웨이브](../assets/audio/tour-alley.wav) | [배경](art/festival/tour-alley.png) |
+| 항구와 해안 | 등대 앞 데크 · 낚시 부두 · 해안 방파제 · 어시장 옆 쉼터 · 썰물 선착장 · 노을 해변무대 | [조수 리듬](../assets/audio/tour-coast.wav) | [배경](art/festival/tour-coast.png) |
+| 숲과 캠핑 | 솔숲 야영장 · 산책로 쉼터 · 계곡 나무마당 · 반딧불 둔덕 · 숲속 목조홀 · 숲길 끝 열린무대 | [솔숲 모닥불](../assets/audio/tour-forest.wav) | [배경](art/festival/tour-forest.png) |
+| 도심의 밤 | 고가 밑 네온마당 · 유리빌딩 테라스 · 환승역 계단무대 · 네온 세탁소 앞 · 주차타워 맨 위 · 막차 플랫폼 | [심야 환승](../assets/audio/tour-metro.wav) | [배경](art/festival/tour-metro.png) |
+| 실내 라이브 | 붉은 벽돌 클럽 · 빈 공장 라이브홀 · 구극장 앞무대 · 레코드숍 스튜디오 · 합주실 메인홀 · 창고 피날레홀 | [벽면의 박자](../assets/audio/tour-hall.wav) | [배경](art/festival/tour-hall.png) |
+| 야시장과 축제 | 등불 거리 · 푸드코트 광장 · 회전목마 앞 · 퍼레이드 수레무대 · 야간 놀이터 · 야간 축제 메인광장 | [등불 행렬](../assets/audio/tour-festival.wav) | [배경](art/festival/tour-festival.png) |
+| 강변과 공원 | 갈대밭 입구 · 수변 계단무대 · 자전거다리 아래 · 분수 광장 · 유람선 갑판 · 달빛 잔디공원 | [강 위의 불빛](../assets/audio/tour-river.wav) | [배경](art/festival/tour-river.png) |
+| 겨울과 산길 | 눈꽃 광장 · 리프트 대기장 · 산장 벽난로홀 · 얼음호수 전망대 · 고갯길 정류장 · 정상 별빛무대 | [눈꽃 카운트](../assets/audio/tour-winter.wav) | [배경](art/festival/tour-winter.png) |
+
+새 공연마다 후렴 세 구간에 걸쳐 사건의 대상 객석, 진입 박, 지속 시간, 볼륨 보정 크기를 배치해요. 각 지역의 마지막 두 공연은 마지막 후렴에서 앞줄과 뒷줄에 사건이 이어서 발생해요. 후렴에서 라우럴 신호를 보낼 구역과 공연 목표도 장소마다 달라져요. 목표가 움직이기 전에 해당 노브에 **3 → 2 → 1**이 표시돼요.
+
+지역 배경 원화 8장에 천막, 데크, 스튜디오, 극장, 트러스, 광장형 무대와 공연장별 조명 배색을 결합해요. 반주는 지역 안에서 공유해요. 기존 반주 4곡과 지역 반주 8곡 및 효과음은 앱에 포함해요. 투어 기록은 공연장 고유 이름을 키로 저장하고, 기존 네 공연의 기록과 해금 상태는 기존 키에서 이어 받아요.
+
+<details>
+<summary>내장 imagegen 지역 배경 프롬프트</summary>
+
+**골목과 광장**
+
+> Use case: stylized-concept. Asset type: backdrop for a 2.5D pixel-art Korean music game, landscape 3:2. Paint a cozy old Korean neighborhood alley opening onto a stone courtyard, low brick and tiled roofs, ginkgo trees, lanterns and a warm sunset, indigo shadows and apricot lights. From a slightly elevated fixed camera, a clear horizon and strong silhouettes fill the upper two thirds; leave the central lower third visually simple to place a separate pixel-art stage and crowd. Crisp, deliberately chunky early 16-bit pixel art, visible stepped square pixels and clean edges, coherent lighting, no painterly or photographic gradients. One wide location establishing shot, no people, no stage, no musicians, no words, no typography, no logo, no UI, no frame.
+
+**항구와 해안**
+
+> Use case: stylized-concept. Asset type: backdrop for a 2.5D pixel-art Korean music game, landscape 3:2. Paint a Korean fishing harbor at vivid blue hour, quiet teal sea, harbor breakwater, distant lighthouse and small moored fishing boats, emerald and coral buoys and clear marine atmosphere. From a slightly elevated fixed camera, a clear horizon and strong silhouettes fill the upper two thirds; leave the central lower third visually simple to place a separate pixel-art stage and crowd. Crisp, deliberately chunky early 16-bit pixel art, visible stepped square pixels and clean edges, coherent lighting, no painterly or photographic gradients. One wide location establishing shot, no people, no stage, no musicians, no words, no typography, no logo, no UI, no frame.
+
+**숲과 캠핑**
+
+> Use case: stylized-concept. Asset type: backdrop for a 2.5D pixel-art Korean music game, landscape 3:2. Paint a Korean forest campsite among tall pines at dusk, wooded hills, tiny trail lanterns and muted distant tents, rich jade and dark moss with firefly-gold highlights. From a slightly elevated fixed camera, a clear horizon and strong silhouettes fill the upper two thirds; leave the central lower third visually simple to place a separate pixel-art stage and crowd. Crisp, deliberately chunky early 16-bit pixel art, visible stepped square pixels and clean edges, coherent lighting, no painterly or photographic gradients. One wide location establishing shot, no people, no stage, no musicians, no words, no typography, no logo, no UI, no frame.
+
+**도심의 밤**
+
+> Use case: stylized-concept. Asset type: backdrop for a 2.5D pixel-art Korean music game, landscape 3:2. Paint a Korean neon city skyline and elevated railway district at night, deep plum glass towers, violet elevated station platforms and soft blue window clusters, atmospheric magenta and indigo. From a slightly elevated fixed camera, a clear horizon and strong silhouettes fill the upper two thirds; leave the central lower third visually simple to place a separate pixel-art stage and crowd. Crisp, deliberately chunky early 16-bit pixel art, visible stepped square pixels and clean edges, coherent lighting, no painterly or photographic gradients. One wide location establishing shot, no people, no stage, no musicians, no words, no typography, no logo, no UI, no frame.
+
+**실내 라이브**
+
+> Use case: stylized-concept. Asset type: backdrop for a 2.5D pixel-art Korean music game, landscape 3:2. Paint a Korean indoor live venue in a converted hall, layered industrial roof beams, midnight brick and dark wood acoustic panels with ruby and cream house lights, distinctive venue architecture. From a slightly elevated fixed camera, a clear horizon and strong silhouettes fill the upper two thirds; leave the central lower third visually simple to place a separate pixel-art stage and crowd. Crisp, deliberately chunky early 16-bit pixel art, visible stepped square pixels and clean edges, coherent lighting, no painterly or photographic gradients. One wide location establishing shot, no people, no stage, no musicians, no words, no typography, no logo, no UI, no frame.
+
+**야시장과 축제**
+
+> Use case: stylized-concept. Asset type: backdrop for a 2.5D pixel-art Korean music game, landscape 3:2. Paint a Korean night fair on a broad plaza, rows of colored paper lanterns and small stall silhouettes on both margins, warm vermilion, peach, dark teal, and golden light. From a slightly elevated fixed camera, a clear horizon and strong silhouettes fill the upper two thirds; leave the central lower third visually simple to place a separate pixel-art stage and crowd. Crisp, deliberately chunky early 16-bit pixel art, visible stepped square pixels and clean edges, coherent lighting, no painterly or photographic gradients. One wide location establishing shot, no people, no stage, no musicians, no words, no typography, no logo, no UI, no frame.
+
+**강변과 공원**
+
+> Use case: stylized-concept. Asset type: backdrop for a 2.5D pixel-art Korean music game, landscape 3:2. Paint a Korean riverside park at blue-hour dusk, spanning bridge with delicate lights, reed beds and water reflections, silver lilac, jade and deep cobalt. From a slightly elevated fixed camera, a clear horizon and strong silhouettes fill the upper two thirds; leave the central lower third visually simple to place a separate pixel-art stage and crowd. Crisp, deliberately chunky early 16-bit pixel art, visible stepped square pixels and clean edges, coherent lighting, no painterly or photographic gradients. One wide location establishing shot, no people, no stage, no musicians, no words, no typography, no logo, no UI, no frame.
+
+**겨울과 산길**
+
+> Use case: stylized-concept. Asset type: backdrop for a 2.5D pixel-art Korean music game, landscape 3:2. Paint a snow-covered Korean mountain town and outdoor plaza with stepped roofs, snowy pine ridges, spruce, warm chalet windows, cobalt twilight and pale peach snowfall details. From a slightly elevated fixed camera, a clear horizon and strong silhouettes fill the upper two thirds; leave the central lower third visually simple to place a separate pixel-art stage and crowd. Crisp, deliberately chunky early 16-bit pixel art, visible stepped square pixels and clean edges, coherent lighting, no painterly or photographic gradients. One wide location establishing shot, no people, no stage, no musicians, no words, no typography, no logo, no UI, no frame.
+
+</details>
+
+지역 배경 외에 내장 imagegen으로 [트러스 무대](art/festival/stage-tour-rig.png), [광장 무대](art/festival/stage-tour-arena.png), [스튜디오 무대](art/festival/stage-tour-studio.png)를 제작했어요.
+
+<details>
+<summary>내장 imagegen 투어 무대 프롬프트</summary>
+
+**트러스**
+
+> Use case: stylized-concept. Asset type: one isolated environment prop for a 2.5D Korean pixel art music game, true transparent PNG, landscape. Draw a compact open-air silver aluminum truss soundstage, tall left and right stacked ladder towers connected by a narrow upper crossbar with violet fluorescent fixtures, low black graphite stage deck with a royal-blue rim and grated steps. Open air through the middle, no curtain or roof. This is a full stage cutout. Straight-on slightly elevated three-quarter camera with a small view of its right side, front edge nearly horizontal. A broad empty uncluttered deck for placing separate performer sprites, with the floor clearly visible in the lower quarter of the solid shape. Keep all corners inside, transparent space outside the prop. Chunky authentic 16-bit pixels, visibly square clusters, hard stepped edges, limited bold palette, matches a pixel-art stage sprite. No people, no instruments, no microphones, no freestanding speakers, no venue background, no ground outside the prop, no text or logos.
+
+**광장**
+
+> Use case: stylized-concept. Asset type: one isolated environment prop for a 2.5D Korean pixel art music game, true transparent PNG, landscape. Draw a wide shallow octagonal outdoor concert deck with a straight middle front edge and chamfered corners, two broad navy and gold steps, ruby stage floor inlaid with brass dots, two small raised side banks with square warm stage lights. Open back and top; no high lighting rack or canopy, no railing through the middle. This is a full stage cutout. Straight-on slightly elevated three-quarter camera with a small view of its right side, front edge nearly horizontal. A broad empty uncluttered deck for placing separate performer sprites, with the floor clearly visible in the lower quarter of the solid shape. Keep all corners inside, transparent space outside the prop. Chunky authentic 16-bit pixels, visibly square clusters, hard stepped edges, limited bold palette, matches a pixel-art stage sprite. No people, no instruments, no microphones, no freestanding speakers, no venue background, no ground outside the prop, no text or logos.
+
+**스튜디오**
+
+> Use case: stylized-concept. Asset type: one isolated environment prop for a 2.5D Korean pixel art music game, true transparent PNG, landscape. Draw a tiny indoor wood-finish acoustic recording-room stage, warm honey parquet deck, low graphite front rim, short stairs, central rear wall of walnut acoustic slats flanked by wine-colored padded sound panels, a low LED strip on top. Keep the side pillars and front floor open. This is a full stage cutout. Straight-on slightly elevated three-quarter camera with a small view of its right side, front edge nearly horizontal. A broad empty uncluttered deck for placing separate performer sprites, with the floor clearly visible in the lower quarter of the solid shape. Keep all corners inside, transparent space outside the prop. Chunky authentic 16-bit pixels, visibly square clusters, hard stepped edges, limited bold palette, matches a pixel-art stage sprite. No people, no instruments, no microphones, no freestanding speakers, no venue background, no ground outside the prop, no text or logos.
+
+</details>

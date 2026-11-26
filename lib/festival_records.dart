@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'festival_performance.dart';
 
-class FestivalRecords {
+class FestivalRecords extends ChangeNotifier {
   FestivalRecords(this._preferences);
 
   final SharedPreferences _preferences;
+  Future<void>? _pendingRecord;
   static const _volume = 'festival.volume';
   static const _vibration = 'festival.vibration';
   static const _rehearsal = 'festival.guidedRehearsal.v2';
@@ -37,6 +40,7 @@ class FestivalRecords {
     FestivalVenue.nightMarket => nightMarketUnlocked,
     FestivalVenue.liveClub => bestFor(FestivalVenue.nightMarket) != null,
     FestivalVenue.rooftop => bestFor(FestivalVenue.liveClub) != null,
+    _ => true,
   };
 
   String _recordKey(FestivalVenue venue) => switch (venue) {
@@ -44,6 +48,7 @@ class FestivalRecords {
     FestivalVenue.nightMarket => _marketConcert,
     FestivalVenue.liveClub => 'festival.liveClubConcert.v1',
     FestivalVenue.rooftop => 'festival.rooftopConcert.v1',
+    _ => 'festival.tour.${venue.name}.v1',
   };
 
   bool missionCompleted(FestivalVenue venue) =>
@@ -67,14 +72,33 @@ class FestivalRecords {
     }
   }
 
-  Future<bool> record(FestivalPerformance performance) async {
-    if (!performance.finished) return false;
+  Future<bool> record(FestivalPerformance performance) {
+    if (!performance.finished) return Future.value(false);
+    final previous = _pendingRecord;
+    final saved = previous == null
+        ? _recordFinished(performance)
+        : previous.then((_) => _recordFinished(performance));
+    final completion = saved.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _pendingRecord = completion;
+    unawaited(
+      completion.then((_) {
+        if (identical(_pendingRecord, completion)) _pendingRecord = null;
+      }),
+    );
+    return saved;
+  }
+
+  Future<bool> _recordFinished(FestivalPerformance performance) async {
     final score = performance.score;
     if (performance.mastery) {
       final best = masteryBest;
-      return best == null || score > best
-          ? _preferences.setInt(_mastery, score)
-          : true;
+      if (best != null && score <= best) return true;
+      final saved = await _preferences.setInt(_mastery, score);
+      if (saved) notifyListeners();
+      return saved;
     }
     if (performance.practiceChorus != null) return true;
     final best = bestFor(performance.venue);
@@ -96,6 +120,7 @@ class FestivalRecords {
           }),
         ),
     ]);
+    if (saved.any((success) => success)) notifyListeners();
     return saved.every((success) => success);
   }
 }

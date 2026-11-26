@@ -27,6 +27,24 @@ enum _Sprite {
     1086,
     Rect.fromLTRB(18, 160, 1415, 972),
   ),
+  tourStudio(
+    'festival/stage-tour-studio',
+    1774,
+    887,
+    Rect.fromLTRB(34, 54, 1712, 851),
+  ),
+  tourRig(
+    'festival/stage-tour-rig',
+    1536,
+    1024,
+    Rect.fromLTRB(10, 30, 1516, 1013),
+  ),
+  tourArena(
+    'festival/stage-tour-arena',
+    1774,
+    887,
+    Rect.fromLTRB(8, 307, 1756, 844),
+  ),
   backdrop('festival/backdrop', 1774, 887, Rect.fromLTRB(241, 39, 1532, 879)),
   speaker('festival/speaker', 1774, 887, Rect.fromLTRB(619, 11, 1148, 876)),
   lighting('festival/lighting', 1774, 887, Rect.fromLTRB(625, 18, 1128, 882)),
@@ -278,6 +296,14 @@ class _FestivalSceneState extends State<FestivalScene> {
               : Stack(
                   fit: StackFit.expand,
                   children: [
+                    if (widget.venue.region case final region?)
+                      Image.asset(
+                        region.backdrop,
+                        fit: BoxFit.cover,
+                        filterQuality: FilterQuality.low,
+                        cacheWidth: 768,
+                        excludeFromSemantics: true,
+                      ),
                     TweenAnimationBuilder<double>(
                       key: ValueKey(widget.readyPulse),
                       tween: Tween(begin: 0, end: 1),
@@ -836,23 +862,37 @@ class _FestivalPainter extends CustomPainter {
         Color(0xFF71DCEE),
         Color(0xFFC1B6FF),
       ],
-      _ => const [Color(0xFF7CE0C2), Color(0xFFFFC46A), Color(0xFFFF9EDA)],
+      _ =>
+        venue.region == null
+            ? const [Color(0xFF7CE0C2), Color(0xFFFFC46A), Color(0xFFFF9EDA)]
+            : [
+                Color(venue.accent),
+                const Color(0xFF7CE0C2),
+                const Color(0xFFFF9EDA),
+              ],
     };
     final count =
         lightingTier +
-        (venue == FestivalVenue.nightMarket || venue == FestivalVenue.liveClub
+        (venue == FestivalVenue.nightMarket ||
+                venue == FestivalVenue.liveClub ||
+                venue.region != null
             ? 1
             : 0);
     for (var i = 0; i < count; i++) {
       final x = switch (venue) {
         FestivalVenue.liveClub => 123.0 + i * 27,
         FestivalVenue.rooftop => 112.0 + i * 34,
-        _ => 78.0 + i * 55,
+        _ when venue.stage == TourStage.arena => i.isEven ? 44.0 : 289.0,
+        _ => venue.region == null ? 78.0 + i * 55 : 112.0 + i * 33,
       };
       final top = _y(switch (venue) {
         FestivalVenue.liveClub => 61,
         FestivalVenue.rooftop => 66,
-        _ => 89,
+        _ => switch (venue.stage) {
+          TourStage.rig => 54,
+          null || TourStage.canopy || TourStage.arena => 89,
+          _ => 66,
+        },
       });
       final color = colors[i % colors.length];
       final beam = Path()
@@ -933,9 +973,11 @@ class _FestivalPainter extends CustomPainter {
     if (zone == null) return;
     final frontRow = zone == FestivalZone.front;
     final y = _y(frontRow ? 182 : 250);
-    final rooftop = venue == FestivalVenue.rooftop;
+    final rooftop = venue == FestivalVenue.rooftop || venue.region != null;
     final paint = Paint()
-      ..color = rooftop ? const Color(0x998FE5FF) : const Color(0xAAE9A0FF);
+      ..color = venue.region != null
+          ? Color(venue.accent).withAlpha(195)
+          : (rooftop ? const Color(0x998FE5FF) : const Color(0xAAE9A0FF));
     final phase = reducedMotion ? 0 : tick % 10;
     for (var i = 0; i < 4; i++) {
       final shift = (frontRow ? phase : -phase).toDouble();
@@ -948,6 +990,53 @@ class _FestivalPainter extends CustomPainter {
         Rect.fromLTWH(x + 5, y + 2 + 5 * (i % 2), rooftop ? 8 : 4, 2),
         paint,
       );
+    }
+  }
+
+  void _drawTourStage(Canvas canvas, TourStage form) {
+    final accent = Color(venue.accent);
+    final tinted = Color.lerp(const Color(0xFFFFFFFF), accent, .35);
+    final (sprite, height) = switch (form) {
+      TourStage.canopy => (_Sprite.stage, 165.0),
+      TourStage.deck => (_Sprite.rooftopStage, 135.0),
+      TourStage.studio => (_Sprite.tourStudio, 115.0),
+      TourStage.theatre => (_Sprite.clubStage, 146.0),
+      TourStage.rig => (_Sprite.tourRig, 148.0),
+      TourStage.arena => (_Sprite.tourArena, 64.0),
+    };
+    if (form == TourStage.arena) {
+      _draw(canvas, _Sprite.lighting, const Offset(39, 168), 98, tint: tinted);
+      _draw(
+        canvas,
+        _Sprite.lighting,
+        const Offset(288, 166),
+        98,
+        mirror: true,
+        tint: tinted,
+      );
+    }
+    if (form == TourStage.canopy || form == TourStage.deck) {
+      _draw(canvas, _Sprite.backdrop, const Offset(52, 151), 46, tint: tinted);
+      _draw(
+        canvas,
+        _Sprite.backdrop,
+        const Offset(278, 149),
+        44,
+        mirror: true,
+        tint: tinted,
+      );
+    }
+    _draw(canvas, sprite, const Offset(172, 178), height, tint: tinted);
+
+    // Stage-edge lights use the venue's palette and a stable fixture spacing.
+    final paint = Paint();
+    final spacing = 18.0 + venue.slot * 3;
+    for (var lamp = 0; lamp < 6; lamp++) {
+      final x = 172 + (lamp - 2.5) * spacing;
+      paint.color = const Color(0xFF282036);
+      canvas.drawRect(Rect.fromLTWH(x - 4, _y(165), 8, 5), paint);
+      paint.color = accent;
+      canvas.drawRect(Rect.fromLTWH(x - 2, _y(165) + 1, 4, 2), paint);
     }
   }
 
@@ -965,6 +1054,10 @@ class _FestivalPainter extends CustomPainter {
       FestivalVenue.nightMarket => const [Color(0xFF1C3E54), Color(0xFF182633)],
       FestivalVenue.liveClub => const [Color(0xFF281831), Color(0xFF21172D)],
       FestivalVenue.rooftop => const [Color(0xFF514484), Color(0xFF19374D)],
+      _ => [
+        Color(venue.region?.ground ?? 0xFF241940).withAlpha(26),
+        const Color(0x80171329),
+      ],
     };
     final outdoorFestival = venue.usesGenerator;
     canvas.drawRect(
@@ -986,7 +1079,7 @@ class _FestivalPainter extends CustomPainter {
       tint: switch (venue) {
         FestivalVenue.liveClub => const Color(0xFFC2A6DA),
         FestivalVenue.rooftop => const Color(0xFFAFCAE3),
-        _ => null,
+        _ => venue.region == null ? null : Color(venue.region!.ground),
       },
     );
     final frontFocused = focusedZone == FestivalZone.front;
@@ -997,7 +1090,9 @@ class _FestivalPainter extends CustomPainter {
     if (backFocused || backCue != MixCue.none) {
       _highlightAudience(canvas, false, _zoneColor(backCue, back.color));
     }
-    if (outdoorFestival) {
+    if (venue.stage case final style?) {
+      _drawTourStage(canvas, style);
+    } else if (outdoorFestival) {
       _draw(canvas, _Sprite.backdrop, const Offset(70, 123), 65);
       _draw(canvas, _Sprite.backdrop, const Offset(292, 123), 58, mirror: true);
       _draw(canvas, _Sprite.lighting, const Offset(39, 154), 103);
