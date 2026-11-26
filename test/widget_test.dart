@@ -145,6 +145,45 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Rear input updates the front target without moving its dial', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 740));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(LaureolApp(records: records));
+    await tester.tap(find.text('공연 시작'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('동네 축제 시작'));
+    await tester.pumpAndSettle();
+
+    final sliders = find.byType(ZoneVolumeSlider);
+    CustomPainter dial(Finder slider) => tester
+        .widget<CustomPaint>(
+          find.descendant(
+            of: _dialGesture(slider),
+            matching: find.byType(CustomPaint),
+          ),
+        )
+        .painter!;
+    final frontBefore = dial(sliders.first);
+    final rearBefore = dial(sliders.last);
+    final frontBounds = tester.getRect(_dialGesture(sliders.first));
+    expect(find.text('목표 48–60%'), findsOneWidget);
+
+    await tester.drag(_dialGesture(sliders.last), const Offset(0, 120));
+    await tester.pump();
+    expect(tester.widget<ZoneVolumeSlider>(sliders.first).value, 50);
+    expect(tester.widget<ZoneVolumeSlider>(sliders.last).value, 0);
+    expect(
+      tester.widget<FestivalScene>(find.byType(FestivalScene)).front,
+      CrowdStatus.quiet,
+    );
+    expect(find.text('목표 56–68%'), findsOneWidget);
+    expect(tester.getRect(_dialGesture(sliders.first)), frontBounds);
+    expect(dial(sliders.first).shouldRepaint(frontBefore), isFalse);
+    expect(dial(sliders.last).shouldRepaint(rearBefore), isTrue);
+  });
+
   testWidgets('Combo reconnect animates in place and respects reduced motion', (
     tester,
   ) async {

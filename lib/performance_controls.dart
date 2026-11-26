@@ -151,8 +151,6 @@ class ZoneVolumeSlider extends StatelessWidget {
         child: vertical
             ? _VolumeDialGesture(
                 value: value,
-                band: band,
-                highlighted: highlighted,
                 enabled: enabled,
                 style: dialStyle,
                 onChanged: onChanged,
@@ -288,8 +286,6 @@ class ZoneVolumeSlider extends StatelessWidget {
 class _VolumeDialGesture extends StatefulWidget {
   const _VolumeDialGesture({
     required this.value,
-    required this.band,
-    required this.highlighted,
     required this.enabled,
     required this.style,
     required this.onChanged,
@@ -297,8 +293,6 @@ class _VolumeDialGesture extends StatefulWidget {
   });
 
   final int value;
-  final ({int minimum, int maximum})? band;
-  final bool highlighted;
   final bool enabled;
   final VolumeDialStyle style;
   final ValueChanged<int> onChanged;
@@ -400,8 +394,6 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
               child: CustomPaint(
                 painter: _VolumeDialPainter(
                   value: widget.value,
-                  band: widget.band,
-                  highlighted: widget.highlighted,
                   enabled: widget.enabled,
                   style: widget.style,
                 ),
@@ -417,15 +409,11 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
 class _VolumeDialPainter extends CustomPainter {
   const _VolumeDialPainter({
     required this.value,
-    required this.band,
-    required this.highlighted,
     required this.enabled,
     required this.style,
   });
 
   final int value;
-  final ({int minimum, int maximum})? band;
-  final bool highlighted;
   final bool enabled;
   final VolumeDialStyle style;
 
@@ -465,23 +453,7 @@ class _VolumeDialPainter extends CustomPainter {
           ..color = major ? _muted : _line,
       );
     }
-    if (band case final target?) {
-      canvas.drawArc(
-        ring,
-        _dialStart + _dialSweep * target.minimum / 100,
-        _dialSweep * (target.maximum - target.minimum) / 100,
-        false,
-        stroke
-          ..color = _mint
-          ..strokeWidth = 4,
-      );
-    }
-
-    final pointer = !enabled
-        ? _muted
-        : highlighted
-        ? _amber
-        : _ink;
+    final pointer = enabled ? _ink : _muted;
     final gripRadius = radius - 7;
     canvas.drawCircle(
       origin.translate(0, 2),
@@ -495,23 +467,6 @@ class _VolumeDialPainter extends CustomPainter {
     canvas.restore();
     canvas.drawCircle(radial(angle, radius), 2.3, Paint()..color = pointer);
 
-    if (band case final target?
-        when enabled &&
-            highlighted &&
-            (value < target.minimum || value > target.maximum)) {
-      final direction = value < target.minimum ? -1.0 : 1.0;
-      final y = origin.dy + direction * (radius + 9);
-      final arrow = Path()
-        ..moveTo(origin.dx - 5, y - direction * 3)
-        ..lineTo(origin.dx, y + direction * 2)
-        ..lineTo(origin.dx + 5, y - direction * 3);
-      canvas.drawPath(
-        arrow,
-        stroke
-          ..strokeWidth = 2
-          ..color = _mint,
-      );
-    }
     if (enabled) {
       _paintKey(canvas, Offset(size.width - 8, 8), add: true);
       _paintKey(canvas, Offset(size.width - 8, size.height - 8), add: false);
@@ -620,8 +575,6 @@ class _VolumeDialPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _VolumeDialPainter oldDelegate) =>
       value != oldDelegate.value ||
-      band != oldDelegate.band ||
-      highlighted != oldDelegate.highlighted ||
       enabled != oldDelegate.enabled ||
       style != oldDelegate.style;
 }
@@ -1085,6 +1038,21 @@ class ZoneControlCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textScaler = MediaQuery.textScalerOf(context);
+    final footerTextSize = textScaler.scale(11);
+    final stackFooter = footerTextSize > 14;
+    final footerLineHeight = footerTextSize * 1.5 + 6;
+    final statusBadge = CrowdStatusBadge(status: status, compact: true);
+    final goal = ExcludeSemantics(
+      child: Text(
+        '목표 ${target.minimum}–${target.maximum}%',
+        style: const TextStyle(
+          color: _mint,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
     return AspectRatio(
       aspectRatio: 1,
       child: Container(
@@ -1102,23 +1070,28 @@ class ZoneControlCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Wrap(
-              spacing: 8,
-              alignment: WrapAlignment.center,
-              children: [
-                Text(
-                  zone,
-                  style: const TextStyle(
-                    color: _ink,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
+            SizedBox(
+              height: textScaler.scale(13) * 1.5,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  children: [
+                    Text(
+                      zone,
+                      style: const TextStyle(
+                        color: _ink,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$volume%',
+                      style: const TextStyle(color: _ink, fontSize: 13),
+                    ),
+                  ],
                 ),
-                Text(
-                  '$volume%',
-                  style: const TextStyle(color: _ink, fontSize: 13),
-                ),
-              ],
+              ),
             ),
             Expanded(
               child: ZoneVolumeSlider(
@@ -1133,7 +1106,17 @@ class ZoneControlCard extends StatelessWidget {
                 onInteractionEnd: onInteractionEnd,
               ),
             ),
-            CrowdStatusBadge(status: status, compact: true),
+            SizedBox(
+              height: stackFooter ? footerLineHeight * 2 : footerLineHeight,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: stackFooter
+                    ? Column(children: [statusBadge, goal])
+                    : Row(
+                        children: [statusBadge, const SizedBox(width: 6), goal],
+                      ),
+              ),
+            ),
           ],
         ),
       ),

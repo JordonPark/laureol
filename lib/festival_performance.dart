@@ -443,7 +443,7 @@ class FestivalPerformance {
       return (
         startsBothRows(FestivalZone.back)
             ? '발전기 정지 · 두 줄 동시 시작 가능'
-            : '발전기 정지 · 민트색 구간에 볼륨을 맞춰요',
+            : '발전기 정지 · 목표 볼륨에 맞춰요',
         null,
       );
     }
@@ -470,7 +470,7 @@ class FestivalPerformance {
     if (chorus != null && _reserved == null && _isOpen(chorus)) {
       return (
         recommendedSignalZone == null
-            ? '민트색 구간에 볼륨을 맞춰요'
+            ? '목표 범위에 볼륨을 맞춰요'
             : '노란 ‘라우럴!’ 버튼으로 신호를 보내요',
         null,
       );

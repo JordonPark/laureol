@@ -932,7 +932,7 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       _RehearsalStep.volume => (
         '뒷줄 볼륨을 맞춰요',
         switch (status) {
-          CrowdStatus.loud => '노브를 반시계 방향으로 돌려 민트색에 맞춰요.',
+          CrowdStatus.loud => '노브를 반시계 방향으로 돌려 목표 범위에 맞춰요.',
           CrowdStatus.ready => '✓ 준비! 여기서 손을 떼세요.',
           _ => '오른쪽 노브를 시계 방향으로 돌려요.',
         },
