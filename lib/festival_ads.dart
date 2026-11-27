@@ -25,8 +25,8 @@ class FestivalAds extends ChangeNotifier {
     if (kIsWeb) return null;
     return switch ((defaultTargetPlatform, _mode)) {
       (TargetPlatform.android, 'test') =>
-        'ca-app-pub-3940256099942544/9214589741',
-      (TargetPlatform.iOS, 'test') => 'ca-app-pub-3940256099942544/2435281174',
+        'ca-app-pub-3940256099942544/6300978111',
+      (TargetPlatform.iOS, 'test') => 'ca-app-pub-3940256099942544/2934735716',
       (TargetPlatform.android, 'live') when kReleaseMode =>
         'ca-app-pub-6973627802571104/2288816940',
       (TargetPlatform.iOS, 'live') when kReleaseMode =>
@@ -116,8 +116,8 @@ class FestivalAds extends ChangeNotifier {
       await sdk.updateRequestConfiguration(
         RequestConfiguration(maxAdContentRating: MaxAdContentRating.g),
       );
-      await sdk.setAppMuted(true);
       await sdk.initialize();
+      await sdk.setAppMuted(true);
     } on Exception {
       _initialize = null;
       rethrow;
