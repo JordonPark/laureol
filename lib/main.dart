@@ -25,9 +25,6 @@ Future<void> main() async {
   runApp(
     LaureolApp(records: FestivalRecords(await SharedPreferences.getInstance())),
   );
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    unawaited(FestivalAds.instance.refreshConsent());
-  });
 }
 
 const _night = Color(0xFF171329);
@@ -436,12 +433,20 @@ class _SelectionScreenState extends State<_SelectionScreen> {
       title: '공연 선택',
       compact: compact,
       maxWidth: sideBySide ? 900 : 520,
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        onPressed: () => _open(context, _TourScreen(records: widget.records)),
-        child: Text('투어 ${FestivalVenue.tourVenues.length}곳'),
-      ),
       children: [
+        Text(
+          '전체 공연장 ${FestivalVenue.values.length}곳',
+          style: const TextStyle(color: _muted),
+        ),
+        _Action(
+          '투어 ${FestivalVenue.tourVenues.length}곳',
+          () => _open(context, _TourScreen(records: widget.records)),
+          primary: true,
+        ),
+        Text(
+          '기본 공연 ${FestivalVenue.originals.length}곳',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
         ..._cardRows(cards, paired: sideBySide),
         Wrap(
           spacing: 8,
@@ -568,13 +573,33 @@ class _TourScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          region.title,
-                          style: const TextStyle(
-                            color: _paper,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        LayoutBuilder(
+                          builder: (context, titleBounds) {
+                            const titleStyle = TextStyle(
+                              color: _paper,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                            );
+                            final measurement = TextPainter(
+                              text: TextSpan(
+                                text: region.title,
+                                style: DefaultTextStyle.of(context).style
+                                    .merge(titleStyle),
+                              ),
+                              textDirection: Directionality.of(context),
+                              textScaler: MediaQuery.textScalerOf(context),
+                              maxLines: 1,
+                            )..layout(maxWidth: titleBounds.maxWidth);
+                            final wrap = measurement.didExceedMaxLines;
+                            measurement.dispose();
+                            return Text(
+                              wrap
+                                  ? region.title.replaceFirst(' ', '\n')
+                                  : region.title,
+                              semanticsLabel: region.title,
+                              style: titleStyle,
+                            );
+                          },
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -1661,7 +1686,7 @@ class _ResultsScreenState extends State<_ResultsScreen> {
       compact: compact,
       maxWidth: wide ? 880 : 520,
       header: !compact && FestivalAds.instance.enabled
-          ? const FestivalResultBanner()
+          ? FestivalResultBanner(records: widget.records)
           : null,
       footer: _ResultActions(
         nextVenue: canContinue ? nextVenue : null,
@@ -2365,16 +2390,37 @@ class _SettingsScreenState extends State<_SettingsScreen> {
           '개인정보 처리방침',
           () => _open(context, const _PrivacyPolicyScreen()),
         ),
-        if (FestivalAds.instance.live)
+        if (FestivalAds.instance.live) ...[
           ListenableBuilder(
-            listenable: FestivalAds.instance,
+            listenable: widget.records,
+            builder: (context, _) => Row(
+              children: [
+                const Expanded(child: Text('결과 화면 광고 허용')),
+                Semantics(
+                  label: '결과 화면 광고 허용',
+                  child: CupertinoSwitch(
+                    value: widget.records.adConsent == true,
+                    onChanged: (value) =>
+                        unawaited(_save(widget.records.setAdConsent(value))),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ListenableBuilder(
+            listenable: Listenable.merge([
+              FestivalAds.instance,
+              widget.records,
+            ]),
             builder: (context, _) {
-              if (!FestivalAds.instance.privacyOptionsRequired) {
+              if (widget.records.adConsent != true ||
+                  !FestivalAds.instance.privacyOptionsRequired) {
                 return const SizedBox.shrink();
               }
               return _Action('광고 개인정보 설정', _showAdPrivacy);
             },
           ),
+        ],
         if (_saveFailed) const Text('설정을 저장하지 못했어요.'),
       ],
     );

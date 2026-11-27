@@ -5,6 +5,21 @@ import 'package:laureol/performance_controls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('Ad permission starts undecided and can be withdrawn', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final records = FestivalRecords(preferences);
+    expect(records.adConsent, isNull);
+
+    expect(await records.setAdConsent(true), isTrue);
+    await preferences.reload();
+    expect(FestivalRecords(preferences).adConsent, isTrue);
+
+    expect(await records.setAdConsent(false), isTrue);
+    await preferences.reload();
+    expect(FestivalRecords(preferences).adConsent, isFalse);
+  });
+
   test(
     'Tour records stay independent across venues and keep the highest score',
     () async {

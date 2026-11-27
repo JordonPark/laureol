@@ -1,4 +1,5 @@
 import Flutter
+import GoogleMobileAds
 import UIKit
 
 @main
@@ -12,5 +13,19 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    let channel = FlutterMethodChannel(
+      name: "com.jordonpark.laureol/ads",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "useContextualAds" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      let configuration = MobileAds.shared.requestConfiguration
+      configuration.setPublisherFirstPartyIDEnabled(false)
+      configuration.publisherPrivacyPersonalizationState = .disabled
+      result(nil)
+    }
   }
 }

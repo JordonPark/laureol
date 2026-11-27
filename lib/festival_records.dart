@@ -13,6 +13,7 @@ class FestivalRecords extends ChangeNotifier {
   Future<void>? _pendingRecord;
   static const _volume = 'festival.volume';
   static const _vibration = 'festival.vibration';
+  static const _adConsent = 'festival.adConsent.v1';
   static const _rehearsal = 'festival.guidedRehearsal.v2';
   static const _concert = 'festival.concert.v1';
   static const _marketConcert = 'festival.marketConcert.v1';
@@ -21,6 +22,7 @@ class FestivalRecords extends ChangeNotifier {
 
   int get volume => _preferences.getInt(_volume) ?? 70;
   bool get vibration => _preferences.getBool(_vibration) ?? true;
+  bool? get adConsent => _preferences.getBool(_adConsent);
   bool get rehearsalCompleted => _preferences.getBool(_rehearsal) ?? false;
   int? get masteryBest => _preferences.getInt(_mastery);
   bool get nightMarketUnlocked =>
@@ -30,6 +32,12 @@ class FestivalRecords extends ChangeNotifier {
       _preferences.setInt(_volume, value.clamp(0, 100));
   Future<bool> setVibration(bool value) =>
       _preferences.setBool(_vibration, value);
+  Future<bool> setAdConsent(bool value) {
+    final saved = _preferences.setBool(_adConsent, value);
+    notifyListeners();
+    return saved;
+  }
+
   Future<bool> completeRehearsal() => _preferences.setBool(_rehearsal, true);
 
   ({int score, ChorusCheckpoint checkpoint})? get concertBest =>

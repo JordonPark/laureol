@@ -54,6 +54,7 @@ jobs:
           if [[ "$LAUREOL_DISTRIBUTION" == app-store ]]; then
             [[ "$LAUREOL_TEST_ADS" != true ]] || { echo '::error::Use test ads only for internal builds.'; exit 1; }
             build_name=(--build-name=1.0)
+            ads_mode=live
           fi
           if [[ "$LAUREOL_TEST_ADS" == "true" ]]; then
             ads_mode=test

@@ -43,6 +43,30 @@ void main() {
     expect(webPolicy.hitTestable(), findsOneWidget);
   });
 
+  testWidgets('Tour is visible and Korean titles wrap between words', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 690));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(LaureolApp(records: records));
+    await tester.tap(find.text('공연 시작'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('전체 공연장 52곳').hitTestable(), findsOneWidget);
+    final tour = find.text('투어 48곳');
+    expect(tour.hitTestable(), findsOneWidget);
+    await tester.tap(tour);
+    await tester.pumpAndSettle();
+
+    final title = find.text('야시장과\n축제');
+    await tester.scrollUntilVisible(title, 140);
+    expect(title.hitTestable(), findsOneWidget);
+    await tester.tap(title);
+    await tester.pumpAndSettle();
+    expect(find.text('야시장과 축제'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'The stage catalog previews 200 variants apart from tour records',
     (tester) async {
@@ -241,7 +265,10 @@ void main() {
     await tester.pumpWidget(LaureolApp(records: firstRun));
     await tester.tap(find.text('공연 시작'));
     await tester.pumpAndSettle();
-    expect(find.text('조작 다시 연습'), findsOneWidget);
+    final rehearse = find.text('조작 다시 연습');
+    await tester.scrollUntilVisible(rehearse, 180);
+    expect(rehearse.hitTestable(), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('동네 축제 시작'), -180);
     await tester.tap(find.text('동네 축제 시작'));
     await tester.pumpAndSettle();
     expect(scene().tick, greaterThanOrEqualTo(160));
