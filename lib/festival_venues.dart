@@ -27,7 +27,6 @@ enum TourRegion {
   final String cut;
 
   String get backdrop => 'docs/art/festival/tour-$name.png';
-  String get music => 'tour-$name.wav';
 
   Iterable<FestivalVenue> get venues =>
       FestivalVenue.tourVenues.where((venue) => venue.region == this);
@@ -153,7 +152,7 @@ class FestivalVenue {
   bool get usesGenerator => this == neighborhood || this == nightMarket;
   String get mission => _originalMission ?? tourGoal.description;
   String get posterAsset => region?.backdrop ?? 'docs/art/festival/$_poster';
-  String get musicAsset => region?.music ?? _music!;
+  String get musicAsset => _music ?? 'map/$name.mp3';
   TourGoal get tourGoal => TourGoal.values[slot];
 
   FestivalVenue? get next {

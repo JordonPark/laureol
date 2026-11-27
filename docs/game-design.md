@@ -1175,3 +1175,75 @@
 > bottom right: one thick charcoal metal support tower with purple and magenta vertical strips, concert scenic wing.
 
 </details>
+
+## 45. 공연장별 오리지널 음악 48곡
+
+투어 48곳에 공연장마다 오리지널 반주 한 곡씩을 배정했다. 같은 지역의 곡은 악기와 리듬의 인상을 공유하고, 공연장마다 제목, 조성, 코드 진행과 주선율을 정했다. 기존 네 공연의 곡과 함께 총 52곳에서 각각의 음원을 오프라인으로 재생한다.
+
+새 투어 반주는 120 BPM, 4/4박자, 92.5초 분량이다. 24초, 52초, 80초에 첫 후렴 박을 넣고 90초부터 자연스럽게 잦아든다. 앱에는 44.1 kHz 스테레오 MP3를 포함한다. 일시정지·이어 하기와 후렴 재도전은 같은 음원의 공연 위치로 이동한다.
+
+| 지역 | 편곡 방향 |
+| --- | --- |
+| 골목과 광장 | 마림바, 일렉트릭 피아노, 8비트 신스의 인디 팝 |
+| 항구와 해안 | 기타의 엇박 스트로크, 가벼운 타악, 파도 느낌의 저음 |
+| 숲과 캠핑 | 현을 뜯는 기타, 나무 타악, 부드러운 목관 |
+| 도심의 밤 | 4비트 킥, 굵은 신스 베이스, 네온 같은 전자음 |
+| 실내 라이브 | 기타 리프, 일렉트릭 피아노, 드럼 백비트 |
+| 야시장과 축제 | 브라스, 합주 타악, 발걸음에 맞춘 행진 리듬 |
+| 강변과 공원 | 피아노, 잔잔한 기타, 흐르는 물을 닮은 엇박 |
+| 겨울과 산길 | 벨, 따뜻한 패드, 짧게 반짝이는 전자음 |
+
+### 공연장별 곡 목록
+
+| 공연장 | 공연곡 |
+| --- | --- |
+| 우체국 앞 작은광장 | [우체국 앞 첫 박](../assets/audio/map/post-office.mp3) |
+| 은행나무 삼거리 | [은행잎 턴테이블](../assets/audio/map/ginkgo.mp3) |
+| 헌책방 골목 | [책갈피의 쉼표](../assets/audio/map/book-lane.mp3) |
+| 오락실 지하광장 | [백 원짜리 코러스](../assets/audio/map/retro-arcade.mp3) |
+| 기와마당 | [기와 위 달그림자](../assets/audio/map/tile-courtyard.mp3) |
+| 옛 역전광장 | [역전광장 앙코르](../assets/audio/map/station-square.mp3) |
+| 등대 앞 데크 | [등대가 켜질 때](../assets/audio/map/lighthouse.mp3) |
+| 낚시 부두 | [낚싯줄과 반박](../assets/audio/map/fishing-pier.mp3) |
+| 해안 방파제 | [방파제를 넘는 파도](../assets/audio/map/sea-wall.mp3) |
+| 어시장 옆 쉼터 | [새벽 경매 박자](../assets/audio/map/fish-market.mp3) |
+| 썰물 선착장 | [썰물의 발자국](../assets/audio/map/tide-dock.mp3) |
+| 노을 해변무대 | [마지막 노을 위로](../assets/audio/map/sunset-beach.mp3) |
+| 솔숲 야영장 | [솔잎 모닥불](../assets/audio/map/pine-camp.mp3) |
+| 산책로 쉼터 | [나무 의자 옆](../assets/audio/map/rest-deck.mp3) |
+| 계곡 나무마당 | [돌 사이 물길](../assets/audio/map/valley-table.mp3) |
+| 반딧불 둔덕 | [반딧불 세기](../assets/audio/map/firefly-bank.mp3) |
+| 숲속 목조홀 | [목조홀 나뭇결](../assets/audio/map/wood-hall.mp3) |
+| 숲길 끝 열린무대 | [숲길 끝에서 만나](../assets/audio/map/forest-stage.mp3) |
+| 고가 밑 네온마당 | [고가 아래 저음](../assets/audio/map/underpass.mp3) |
+| 유리빌딩 테라스 | [유리 외벽 반사광](../assets/audio/map/glass-tower.mp3) |
+| 환승역 계단무대 | [환승 30초 전](../assets/audio/map/station-steps.mp3) |
+| 네온 세탁소 앞 | [네온 세탁소 스핀](../assets/audio/map/neon-laundry.mp3) |
+| 주차타워 맨 위 | [주차타워 야경](../assets/audio/map/parking-top.mp3) |
+| 막차 플랫폼 | [막차 문이 닫히고](../assets/audio/map/last-train.mp3) |
+| 붉은 벽돌 클럽 | [붉은 벽돌 백비트](../assets/audio/map/brick-club.mp3) |
+| 빈 공장 라이브홀 | [철제 보 위의 리프](../assets/audio/map/factory.mp3) |
+| 구극장 앞무대 | [커튼이 올라오면](../assets/audio/map/cinema.mp3) |
+| 레코드숍 스튜디오 | [바늘 아래 45회전](../assets/audio/map/record-store.mp3) |
+| 합주실 메인홀 | [첫 합주의 마디](../assets/audio/map/rehearsal-hall.mp3) |
+| 창고 피날레홀 | [창고 벽을 타고](../assets/audio/map/warehouse.mp3) |
+| 등불 거리 | [등불 행렬의 시작](../assets/audio/map/lantern-row.mp3) |
+| 푸드코트 광장 | [첫 모금에 한 박](../assets/audio/map/food-court.mp3) |
+| 회전목마 앞 | [목마의 마지막 한 바퀴](../assets/audio/map/carousel.mp3) |
+| 퍼레이드 수레무대 | [수레 지나가는 길](../assets/audio/map/street-float.mp3) |
+| 야간 놀이터 | [밤 놀이터 점프](../assets/audio/map/midway.mp3) |
+| 야간 축제 메인광장 | [메인광장이 하나로](../assets/audio/map/main-fair.mp3) |
+| 갈대밭 입구 | [갈대가 방향을 틀 때](../assets/audio/map/reed-park.mp3) |
+| 수변 계단무대 | [물가의 반걸음](../assets/audio/map/water-stairs.mp3) |
+| 자전거다리 아래 | [자전거 다리 아래](../assets/audio/map/bike-bridge.mp3) |
+| 분수 광장 | [분수의 여덟 박](../assets/audio/map/fountain-park.mp3) |
+| 유람선 갑판 | [갑판에 선 밤](../assets/audio/map/boat-stage.mp3) |
+| 달빛 잔디공원 | [잔디 위 달빛](../assets/audio/map/night-park.mp3) |
+| 눈꽃 광장 | [눈꽃 카운트](../assets/audio/map/snow-square.mp3) |
+| 리프트 대기장 | [리프트가 올라가](../assets/audio/map/ski-lift.mp3) |
+| 산장 벽난로홀 | [벽난로 옆 세 의자](../assets/audio/map/cabin.mp3) |
+| 얼음호수 전망대 | [얼음 밑 긴 음](../assets/audio/map/frozen-lake.mp3) |
+| 고갯길 정류장 | [고갯길 종소리](../assets/audio/map/pass-station.mp3) |
+| 정상 별빛무대 | [정상에서 부르는 빛](../assets/audio/map/summit.mp3) |
+
+편곡은 [투어 악보 데이터](../tool/tour_music_scores.py)에 있고, `python tool/render_tour_music.py`로 [합성 렌더러](../tool/render_tour_music.py)를 실행하면 곡을 다시 만들 수 있다.

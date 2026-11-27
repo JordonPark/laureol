@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laureol/festival_performance.dart';
 import 'package:laureol/performance_controls.dart';
@@ -9,6 +10,26 @@ void _at(FestivalPerformance performance, double seconds) {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('Every playable venue has its own bundled soundtrack', () async {
+    final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+    final bundled = manifest.listAssets().toSet();
+    final music = FestivalVenue.values
+        .map((venue) => 'assets/audio/${venue.musicAsset}')
+        .toSet();
+    expect(music, hasLength(FestivalVenue.values.length));
+    expect(bundled, containsAll(music));
+    expect(
+      bundled.where((asset) => asset.startsWith('assets/audio/map/')),
+      unorderedEquals(
+        FestivalVenue.tourVenues.map(
+          (venue) => 'assets/audio/${venue.musicAsset}',
+        ),
+      ),
+    );
+  });
+
   test('All 48 tour charts are distinct, finish, and have achievable goals', () {
     expect(FestivalVenue.values, hasLength(52));
     expect(
