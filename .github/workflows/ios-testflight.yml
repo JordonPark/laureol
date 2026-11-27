@@ -7,6 +7,10 @@ on:
         description: Upload the archive for internal TestFlight testing
         type: boolean
         default: false
+      test_ads:
+        description: Enable Google's sample banner in this internal build
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -29,13 +33,19 @@ jobs:
           echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
 
       - name: Check and archive the iPhone app
+        env:
+          LAUREOL_TEST_ADS: ${{ inputs.test_ads }}
         run: |
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
           flutter pub get --enforce-lockfile
           flutter analyze --no-pub
           flutter test --no-pub
-          flutter build ipa --release --no-codesign --no-pub --build-number="$GITHUB_RUN_NUMBER"
+          ads_mode=off
+          if [[ "$LAUREOL_TEST_ADS" == "true" ]]; then
+            ads_mode=test
+          fi
+          flutter build ipa --release --no-codesign --no-pub --build-number="$GITHUB_RUN_NUMBER" --dart-define="LAUREOL_ADS_MODE=$ads_mode"
           archive="$PWD/build/ios/archive/Runner.xcarchive"
           test "$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleIdentifier' "$archive/Info.plist")" = com.jordonpark.laureol
 

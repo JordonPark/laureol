@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'chorus_summary.dart';
 import 'concert_stage_art.dart';
+import 'festival_ads.dart';
 import 'festival_audio.dart';
 import 'festival_performance.dart';
 import 'festival_records.dart';
@@ -23,6 +24,9 @@ Future<void> main() async {
   runApp(
     LaureolApp(records: FestivalRecords(await SharedPreferences.getInstance())),
   );
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(FestivalAds.instance.refreshConsent());
+  });
 }
 
 const _night = Color(0xFF171329);
@@ -102,6 +106,7 @@ class _Screen extends StatelessWidget {
     required this.children,
     this.trailing,
     this.middle,
+    this.header,
     this.footer,
     this.previousPageTitle = '뒤로',
     this.compact = false,
@@ -112,6 +117,7 @@ class _Screen extends StatelessWidget {
   final List<Widget> children;
   final Widget? trailing;
   final Widget? middle;
+  final Widget? header;
   final Widget? footer;
   final String previousPageTitle;
   final bool compact;
@@ -146,12 +152,13 @@ class _Screen extends StatelessWidget {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
-            child: footer == null
+            child: footer == null && header == null
                 ? content
                 : Column(
                     children: [
+                      ?header,
                       Expanded(child: content),
-                      footer!,
+                      ?footer,
                     ],
                   ),
           ),
@@ -1652,6 +1659,9 @@ class _ResultsScreenState extends State<_ResultsScreen> {
           : '공연장',
       compact: compact,
       maxWidth: wide ? 880 : 520,
+      header: !compact && FestivalAds.instance.enabled
+          ? const FestivalResultBanner()
+          : null,
       footer: _ResultActions(
         nextVenue: canContinue ? nextVenue : null,
         onNext: canContinue ? () => _play(nextVenue) : null,
@@ -2297,8 +2307,35 @@ class _SettingsScreenState extends State<_SettingsScreen> {
           ],
         ),
         const Text('공연은 소리를 꺼도 플레이할 수 있어요.', style: TextStyle(color: _muted)),
+        if (FestivalAds.instance.live)
+          ListenableBuilder(
+            listenable: FestivalAds.instance,
+            builder: (context, _) {
+              if (!FestivalAds.instance.privacyOptionsRequired) {
+                return const SizedBox.shrink();
+              }
+              return _Action('광고 개인정보 설정', _showAdPrivacy);
+            },
+          ),
         if (_saveFailed) const Text('설정을 저장하지 못했어요.'),
       ],
+    );
+  }
+
+  Future<void> _showAdPrivacy() async {
+    if (await FestivalAds.instance.showPrivacyOptions() || !mounted) return;
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('광고 개인정보 설정'),
+        content: const Text('지금 설정을 불러올 수 없어요.'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
     );
   }
 }
