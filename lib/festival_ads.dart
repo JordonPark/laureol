@@ -103,7 +103,7 @@ class FestivalAds extends ChangeNotifier {
         }
       }
       if (!onResults()) return false;
-      await (_initialize ??= _startSdk()).timeout(_networkWait);
+      await (_initialize ??= _startSdk());
       return onResults();
     } on Exception {
       return false;
@@ -209,7 +209,7 @@ class _ResultBannerSlotState extends State<_ResultBannerSlot> {
     if (unit == null) return;
 
     try {
-      if (!await ads._adReady(_onResults)) return;
+      if (!await ads._adReady(_onResults) || !_onResults()) return;
       final ad = BannerAd(
         size: AdSize.banner,
         adUnitId: unit,
