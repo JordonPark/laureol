@@ -69,6 +69,17 @@ jobs:
           printf '%s\n' "$ASC_PRIVATE_KEY" > "$key"
           unset ASC_PRIVATE_KEY
 
+          archive="$PWD/build/ios/archive/Runner.xcarchive"
+          frameworks="$archive/Products/Applications/Runner.app/Frameworks"
+          # Match the ad-hoc signatures on Flutter's embedded frameworks so
+          # Xcode can replace them with the team's signature during export.
+          for name in GoogleMobileAds UserMessagingPlatform; do
+            framework="$frameworks/$name.framework"
+            test -d "$framework"
+            codesign --force --sign - "$framework"
+            codesign --verify --strict "$framework"
+          done
+
           options="$scratch/ExportOptions.plist"
           plutil -create xml1 "$options"
           plutil -insert method -string app-store-connect "$options"
@@ -78,7 +89,7 @@ jobs:
           plutil -insert manageAppVersionAndBuildNumber -bool NO "$options"
           plutil -insert testFlightInternalTestingOnly -bool YES "$options"
 
-          xcodebuild -exportArchive -archivePath "$PWD/build/ios/archive/Runner.xcarchive" \
+          xcodebuild -exportArchive -archivePath "$archive" \
             -exportPath "$scratch/export" -exportOptionsPlist "$options" \
             -allowProvisioningUpdates -authenticationKeyPath "$key" \
             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
