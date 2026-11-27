@@ -110,6 +110,7 @@ class ZoneVolumeSlider extends StatelessWidget {
     this.highlighted = false,
     this.vertical = false,
     this.dialStyle = VolumeDialStyle.front,
+    this.maxDialSize = 128,
     this.target,
     this.onInteractionStart,
     this.onInteractionEnd,
@@ -122,6 +123,7 @@ class ZoneVolumeSlider extends StatelessWidget {
   final bool highlighted;
   final bool vertical;
   final VolumeDialStyle dialStyle;
+  final double maxDialSize;
   final ({int minimum, int maximum})? target;
   final VoidCallback? onInteractionStart;
   final VoidCallback? onInteractionEnd;
@@ -157,6 +159,7 @@ class ZoneVolumeSlider extends StatelessWidget {
                 value: value,
                 enabled: enabled,
                 style: dialStyle,
+                maxSize: maxDialSize,
                 guide: band,
                 onChanged: onChanged,
                 onInteractionStart: onInteractionStart,
@@ -294,6 +297,7 @@ class _VolumeDialGesture extends StatefulWidget {
     required this.value,
     required this.enabled,
     required this.style,
+    required this.maxSize,
     required this.guide,
     required this.onChanged,
     required this.onInteractionStart,
@@ -303,6 +307,7 @@ class _VolumeDialGesture extends StatefulWidget {
   final int value;
   final bool enabled;
   final VolumeDialStyle style;
+  final double maxSize;
   final ({int minimum, int maximum})? guide;
   final ValueChanged<int> onChanged;
   final VoidCallback? onInteractionStart;
@@ -405,7 +410,7 @@ class _VolumeDialGestureState extends State<_VolumeDialGesture> {
     return LayoutBuilder(
       builder: (context, bounds) {
         final side = math.min(
-          128.0,
+          widget.maxSize,
           math.min(bounds.maxWidth, bounds.maxHeight),
         );
         return Center(

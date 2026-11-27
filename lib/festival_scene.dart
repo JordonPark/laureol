@@ -195,6 +195,7 @@ class FestivalScene extends StatefulWidget {
     this.readyZones = 0,
     this.signalPulse,
     this.activeMixZone,
+    this.rehearsalGuide = false,
   });
 
   final int tick;
@@ -219,6 +220,7 @@ class FestivalScene extends StatefulWidget {
   final int readyZones;
   final ({int serial, int rows})? signalPulse;
   final FestivalZone? activeMixZone;
+  final bool rehearsalGuide;
 
   @override
   State<FestivalScene> createState() => _FestivalSceneState();
@@ -412,6 +414,7 @@ class _FestivalSceneState extends State<FestivalScene> {
                           readyZones: widget.readyZones,
                           pulseProgress: progress,
                           activeMixZone: widget.activeMixZone,
+                          rehearsalGuide: widget.rehearsalGuide,
                           reducedMotion: MediaQuery.disableAnimationsOf(
                             context,
                           ),
@@ -698,6 +701,7 @@ class _FestivalPainter extends CustomPainter {
     required this.readyZones,
     required this.pulseProgress,
     required this.activeMixZone,
+    required this.rehearsalGuide,
     required this.reducedMotion,
   }) : images = Map.of(images),
        interiorRegion = _interiorRegion(venue);
@@ -724,6 +728,7 @@ class _FestivalPainter extends CustomPainter {
   final int readyZones;
   final double pulseProgress;
   final FestivalZone? activeMixZone;
+  final bool rehearsalGuide;
   final bool reducedMotion;
 
   final _nearest = Paint()..filterQuality = FilterQuality.none;
@@ -1170,11 +1175,14 @@ class _FestivalPainter extends CustomPainter {
     _drawInteriorFloor(canvas);
     final frontFocused = focusedZone == FestivalZone.front;
     final backFocused = focusedZone == FestivalZone.back;
+    final backHighlight = rehearsalGuide
+        ? (backCue == MixCue.signal ? const Color(0xFFFFC46A) : back.color)
+        : _zoneColor(backCue, back.color);
     if (frontFocused || frontCue != MixCue.none) {
       _highlightAudience(canvas, true, _zoneColor(frontCue, front.color));
     }
     if (backFocused || backCue != MixCue.none) {
-      _highlightAudience(canvas, false, _zoneColor(backCue, back.color));
+      _highlightAudience(canvas, false, backHighlight);
     }
     _drawInteriorProps(canvas, floor: false);
     if (venue.stage case final style?) {
@@ -1276,24 +1284,33 @@ class _FestivalPainter extends CustomPainter {
     _drawVenueEvent(canvas);
     final choose = canSelectAudience ? ' ›' : '';
     _drawReadyPulse(canvas);
+    if (!rehearsalGuide) {
+      _zoneLabel(
+        canvas,
+        '앞줄 ${_zoneMark(frontCue, front)}${frontFocused ? focusPercent : choose}',
+        _zoneColor(
+          frontCue,
+          frontFocused ? front.color : const Color(0xFF7CE0C2),
+        ),
+        const Offset(15, 189),
+        focused: frontFocused || frontCue != MixCue.none,
+        statusColor: front.color,
+      );
+    }
     _zoneLabel(
       canvas,
-      '앞줄 ${_zoneMark(frontCue, front)}${frontFocused ? focusPercent : choose}',
-      _zoneColor(
-        frontCue,
-        frontFocused ? front.color : const Color(0xFF7CE0C2),
-      ),
-      const Offset(15, 189),
-      focused: frontFocused || frontCue != MixCue.none,
-      statusColor: front.color,
-    );
-    _zoneLabel(
-      canvas,
-      '뒷줄 ${_zoneMark(backCue, back)}${backFocused ? focusPercent : choose}',
-      _zoneColor(backCue, backFocused ? back.color : const Color(0xFFFFC46A)),
+      rehearsalGuide
+          ? '뒷줄'
+          : '뒷줄 ${_zoneMark(backCue, back)}${backFocused ? focusPercent : choose}',
+      rehearsalGuide
+          ? backHighlight
+          : _zoneColor(
+              backCue,
+              backFocused ? back.color : const Color(0xFFFFC46A),
+            ),
       const Offset(15, 253),
       focused: backFocused || backCue != MixCue.none,
-      statusColor: back.color,
+      statusColor: rehearsalGuide ? backHighlight : back.color,
     );
     canvas.restore();
   }
@@ -1318,6 +1335,7 @@ class _FestivalPainter extends CustomPainter {
       interior != oldDelegate.interior ||
       stageAtlas != oldDelegate.stageAtlas ||
       activeMixZone != oldDelegate.activeMixZone ||
+      rehearsalGuide != oldDelegate.rehearsalGuide ||
       reducedMotion != oldDelegate.reducedMotion ||
       venue != oldDelegate.venue ||
       compact != oldDelegate.compact ||

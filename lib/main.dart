@@ -16,6 +16,8 @@ import 'festival_scene.dart';
 import 'performance_controls.dart';
 import 'venue_card.dart';
 
+part 'rehearsal_panel.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
@@ -1179,7 +1181,6 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
 
   ZoneControlCard _volumeControl(FestivalZone zone) {
     final performance = _performance;
-    final rehearsal = _rehearsalStep;
     final selected = _focusedZone == zone;
     final cue = _mixCue(zone);
     return ZoneControlCard(
@@ -1191,17 +1192,13 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       volume: performance.volume(zone),
       selected: selected,
       needsRescue: performance.needsRescue(zone),
-      targetCountdown: _preparingConcert || rehearsal != null
+      targetCountdown: _preparingConcert
           ? null
           : performance.mixTargetCountdown(zone),
       onInteractionStart: () => _selectZone(zone),
       onVolumeChanged: (value) => _changeVolume(zone, value),
       target: performance.readyVolumeRange(zone),
       cue: cue,
-      enabled: rehearsal == null || rehearsal == _RehearsalStep.volume,
-      onInteractionEnd: rehearsal == _RehearsalStep.volume
-          ? _finishVolumePractice
-          : null,
     );
   }
 
@@ -1231,98 +1228,73 @@ class _PerformanceScreenState extends State<_PerformanceScreen>
       readyZones: _readyZones,
       signalPulse: _signalPulse,
       activeMixZone: performance.activeMixZone,
+      rehearsalGuide: _rehearsalStep != null,
     );
   }
 
   Widget _buildRehearsal(BuildContext context, BoxConstraints viewport) {
     final step = _rehearsalStep!;
-    final status = _performance.status(FestivalZone.back);
-    final (title, instruction) = switch (step) {
-      _RehearsalStep.volume => (
-        '뒷줄 볼륨을 맞춰요',
-        switch (status) {
-          CrowdStatus.loud => '노브를 반시계 방향으로 돌리거나 가운데를 아래로 밀어요.',
-          CrowdStatus.ready => '✓ 준비! 여기서 손을 떼세요.',
-          _ => '오른쪽 노브를 살짝 돌리거나 가운데를 위로 밀어요.',
-        },
-      ),
-      _RehearsalStep.signal => ('이제 관객에게 신호를 보내요', '아래 노란 라우럴!을 누르고 뒷줄을 보세요.'),
-      _RehearsalStep.response => (
-        status == CrowdStatus.singing ? '관객이 따라 불러요!' : '신호를 보냈어요',
-        '본 공연에서 두 줄이 함께 부르면 콤보가 쌓여요.',
-      ),
-    };
+    const zone = FestivalZone.back;
+    final status = _performance.status(zone);
     final media = MediaQuery.of(context);
     final safeWidth = viewport.maxWidth - media.padding.horizontal;
     final bodyHeight =
         viewport.maxHeight -
         media.padding.vertical -
         kMinInteractiveDimensionCupertino;
-    final wide = safeWidth >= 600 && viewport.maxWidth > viewport.maxHeight;
-    final panel = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Semantics(
-          header: true,
-          liveRegion: true,
-          child: Text(
-            title,
-            style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(instruction, style: const TextStyle(color: _paper)),
-      ],
-    );
-    final signal = SignalButton(
-      state: _performance.signal(FestivalZone.back),
-      label: step == _RehearsalStep.response ? '본 공연 준비 중' : null,
-      onPressed: () => _sendSignal(FestivalZone.back),
-    );
-    final visual = Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: math.max(
-            175,
-            math.min(285, bodyHeight - (wide ? 14 : 334)),
-          ),
-        ),
-        child: _scene(compact: true),
+    final wide =
+        safeWidth >= 600 &&
+        viewport.maxWidth > viewport.maxHeight &&
+        media.textScaler.scale(15) <= 20;
+    final dialSize = safeWidth >= 350 ? 172.0 : 148.0;
+    final accent = switch (step) {
+      _RehearsalStep.volume => status.color,
+      _RehearsalStep.signal => _gold,
+      _RehearsalStep.response =>
+        status == CrowdStatus.singing ? status.color : _mint,
+    };
+    final scene = ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: math.max(105, math.min(350, bodyHeight - (wide ? 78 : 260))),
       ),
+      child: _scene(compact: true),
     );
-    final knob = Align(
-      alignment: Alignment.centerRight,
-      child: SizedBox(width: 136, child: _volumeControl(FestivalZone.back)),
+    final deck = _RehearsalDeck(
+      step: step,
+      status: status,
+      accent: accent,
+      volume: _performance.volume(zone),
+      dialSize: dialSize,
+      wide: wide,
+      feedbackBeat: _performance.beatInMeasure,
+      control: switch (step) {
+        _RehearsalStep.volume => ZoneVolumeSlider(
+          zone: '뒷줄',
+          value: _performance.volume(zone),
+          onChanged: (value) => _changeVolume(zone, value),
+          highlighted: _mixCue(zone) == MixCue.adjust,
+          target: _performance.readyVolumeRange(zone),
+          vertical: true,
+          dialStyle: VolumeDialStyle.back,
+          maxDialSize: dialSize,
+          onInteractionEnd: _finishVolumePractice,
+        ),
+        _RehearsalStep.signal => SignalButton(
+          state: _performance.signal(zone),
+          onPressed: () => _sendSignal(zone),
+        ),
+        _RehearsalStep.response => null,
+      },
     );
     return _Screen(
       title: '리허설',
       compact: true,
       maxWidth: wide ? 900 : 520,
       trailing: _pauseButton(),
-      children: wide
-          ? [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        panel,
-                        const SizedBox(height: 8),
-                        knob,
-                        if (step != _RehearsalStep.volume) ...[
-                          const SizedBox(height: 12),
-                          signal,
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(child: visual),
-                ],
-              ),
-            ]
-          : [panel, visual, knob, if (step != _RehearsalStep.volume) signal],
+      children: [
+        _RehearsalProgress(step: step, accent: accent),
+        _RehearsalBoard(wide: wide, accent: accent, scene: scene, deck: deck),
+      ],
     );
   }
 

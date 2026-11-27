@@ -164,7 +164,8 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final firstRun = FestivalRecords(await SharedPreferences.getInstance());
     await firstRun.setVolume(0);
-    await tester.binding.setSurfaceSize(const Size(390, 740));
+    const viewport = Size(320, 640);
+    await tester.binding.setSurfaceSize(viewport);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(LaureolApp(records: firstRun));
     await tester.tap(find.text('공연 시작'));
@@ -178,13 +179,17 @@ void main() {
     expect(find.byType(PerformanceScore), findsNothing);
     expect(find.text('라우럴!'), findsNothing);
     expect(scene().tick, 0);
-    expect(find.text('뒷줄 볼륨을 맞춰요'), findsOneWidget);
+    expect(find.text('뒷줄 볼륨'), findsOneWidget);
+    expect(find.bySemanticsLabel('조율, 현재 단계'), findsOneWidget);
+    expect(tester.widget<ZoneVolumeSlider>(rear).target, isNotNull);
     expect(tester.widget<ZoneVolumeSlider>(rear).highlighted, isTrue);
     await tester.pump(const Duration(seconds: 25));
     expect(scene().tick, 0);
 
     final rearTrack = _dialGesture(rear);
     final track = tester.getRect(rearTrack);
+    expect(track.width, greaterThanOrEqualTo(140));
+    expect(track.bottom, lessThan(viewport.height));
     final gesture = await tester.startGesture(
       Offset(track.center.dx, track.top + track.height * .60),
     );
@@ -196,8 +201,10 @@ void main() {
     expect(find.text('라우럴!'), findsNothing);
     await gesture.up();
     await tester.pump();
-    expect(find.text('이제 관객에게 신호를 보내요'), findsOneWidget);
-    expect(find.text('라우럴!'), findsOneWidget);
+    expect(find.text('뒷줄에 신호 보내기'), findsOneWidget);
+    expect(find.bySemanticsLabel('신호, 현재 단계'), findsOneWidget);
+    expect(find.text('라우럴!').hitTestable(), findsOneWidget);
+    expect(rear, findsNothing);
     expect(scene().tick, 112);
     await tester.pump(const Duration(seconds: 25));
     expect(scene().tick, 112);
