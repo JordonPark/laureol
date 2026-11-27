@@ -461,17 +461,32 @@ void main() {
 
   for (final (name, size, padding) in [
     (
-      'short portrait',
+      'iPhone short portrait',
       const Size(390, 740),
       const EdgeInsets.only(top: 59, bottom: 34),
     ),
     (
-      'landscape with a notch',
+      'iPhone landscape with a notch',
       const Size(852, 393),
       const EdgeInsets.only(left: 59, right: 59, bottom: 21),
     ),
+    (
+      'iPhone Duo outer portrait',
+      const Size(466, 678),
+      const EdgeInsets.only(top: 59, bottom: 34),
+    ),
+    (
+      'iPhone Duo inner portrait',
+      const Size(669, 951),
+      const EdgeInsets.only(top: 59, bottom: 34),
+    ),
+    (
+      'iPad 13-inch portrait',
+      const Size(1032, 1376),
+      const EdgeInsets.only(top: 24, bottom: 20),
+    ),
   ]) {
-    testWidgets('iPhone $name keeps live controls and results in reach', (
+    testWidgets('$name keeps live controls and results in reach', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(size);
