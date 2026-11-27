@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'chorus_summary.dart';
 import 'concert_stage_art.dart';
@@ -2255,6 +2256,59 @@ class _PracticeResultsScreen extends StatelessWidget {
   }
 }
 
+class _PrivacyPolicyScreen extends StatelessWidget {
+  const _PrivacyPolicyScreen();
+
+  static final _webPolicy = Uri.https(
+    'jordonpark.github.io',
+    '/laureol/privacy.txt',
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return _Screen(
+      title: '개인정보 처리방침',
+      children: [
+        FutureBuilder<String>(
+          future: DefaultAssetBundle.of(context).loadString('site/privacy.txt'),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return const Text('방침을 불러오지 못했어요. 웹에서 열어 주세요.');
+            }
+            final policy = snapshot.data;
+            if (policy == null) return const CupertinoActivityIndicator();
+            return Text(policy.trim(), style: const TextStyle(height: 1.5));
+          },
+        ),
+        _Action('웹에서 처리방침 열기', () => _openWebPolicy(context)),
+      ],
+    );
+  }
+
+  Future<void> _openWebPolicy(BuildContext context) async {
+    try {
+      if (await launchUrl(_webPolicy, mode: LaunchMode.externalApplication)) {
+        return;
+      }
+    } on Exception {
+      // The bundled policy remains available when a browser cannot be opened.
+    }
+    if (!context.mounted) return;
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('웹 페이지를 열지 못했어요.'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SettingsScreen extends StatefulWidget {
   const _SettingsScreen({required this.records});
 
@@ -2307,6 +2361,10 @@ class _SettingsScreenState extends State<_SettingsScreen> {
           ],
         ),
         const Text('공연은 소리를 꺼도 플레이할 수 있어요.', style: TextStyle(color: _muted)),
+        _Action(
+          '개인정보 처리방침',
+          () => _open(context, const _PrivacyPolicyScreen()),
+        ),
         if (FestivalAds.instance.live)
           ListenableBuilder(
             listenable: FestivalAds.instance,

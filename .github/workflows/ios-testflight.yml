@@ -4,9 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       upload:
-        description: Upload the archive for internal TestFlight testing
+        description: Upload the signed archive to App Store Connect
         type: boolean
         default: false
+      distribution:
+        description: Distribution audience
+        type: choice
+        options:
+          - internal
+          - app-store
+        default: internal
       test_ads:
         description: Enable Google's sample banner in this internal build
         type: boolean
@@ -35,6 +42,7 @@ jobs:
       - name: Check and archive the iPhone app
         env:
           LAUREOL_TEST_ADS: ${{ inputs.test_ads }}
+          LAUREOL_DISTRIBUTION: ${{ inputs.distribution }}
         run: |
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
@@ -42,20 +50,26 @@ jobs:
           flutter analyze --no-pub
           flutter test --no-pub
           ads_mode=off
+          build_name=()
+          if [[ "$LAUREOL_DISTRIBUTION" == app-store ]]; then
+            [[ "$LAUREOL_TEST_ADS" != true ]] || { echo '::error::Use test ads only for internal builds.'; exit 1; }
+            build_name=(--build-name=1.0)
+          fi
           if [[ "$LAUREOL_TEST_ADS" == "true" ]]; then
             ads_mode=test
           fi
-          flutter build ipa --release --no-codesign --no-pub --build-number="$GITHUB_RUN_NUMBER" --dart-define="LAUREOL_ADS_MODE=$ads_mode"
+          flutter build ipa --release --no-codesign --no-pub --build-number="$GITHUB_RUN_NUMBER" --dart-define="LAUREOL_ADS_MODE=$ads_mode" "${build_name[@]}"
           archive="$PWD/build/ios/archive/Runner.xcarchive"
           test "$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleIdentifier' "$archive/Info.plist")" = com.jordonpark.laureol
 
-      - name: Sign and upload to internal TestFlight
+      - name: Sign and upload to App Store Connect
         if: inputs.upload
         env:
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           ASC_KEY_ID: ${{ vars.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ vars.ASC_ISSUER_ID }}
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          LAUREOL_DISTRIBUTION: ${{ inputs.distribution }}
         shell: bash
         run: |
           if [[ ! "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ || ! "$ASC_KEY_ID" =~ ^[A-Z0-9]{10}$ || -z "$ASC_ISSUER_ID" || -z "$ASC_PRIVATE_KEY" ]]; then
@@ -87,7 +101,9 @@ jobs:
           plutil -insert signingStyle -string automatic "$options"
           plutil -insert teamID -string "$APPLE_TEAM_ID" "$options"
           plutil -insert manageAppVersionAndBuildNumber -bool NO "$options"
-          plutil -insert testFlightInternalTestingOnly -bool YES "$options"
+          if [[ "$LAUREOL_DISTRIBUTION" == internal ]]; then
+            plutil -insert testFlightInternalTestingOnly -bool YES "$options"
+          fi
 
           xcodebuild -exportArchive -archivePath "$archive" \
             -exportPath "$scratch/export" -exportOptionsPlist "$options" \

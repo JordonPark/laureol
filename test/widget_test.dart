@@ -28,6 +28,21 @@ void main() {
     expect(find.bySemanticsLabel('라우럴! 볼륨 좀 올려'), findsOneWidget);
   });
 
+  testWidgets('Settings opens the bundled privacy policy', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 740));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(LaureolApp(records: records));
+    await tester.tap(find.bySemanticsLabel('설정'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('개인정보 처리방침'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('기기에 저장하는 정보'), findsOneWidget);
+    final webPolicy = find.text('웹에서 처리방침 열기');
+    await tester.scrollUntilVisible(webPolicy, 250);
+    expect(webPolicy.hitTestable(), findsOneWidget);
+  });
+
   testWidgets(
     'The stage catalog previews 200 variants apart from tour records',
     (tester) async {
