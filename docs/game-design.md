@@ -662,7 +662,7 @@
 
 | 효과음 | 길이 | 재생 지점 |
 |---|---:|---|
-| [라우럴! 음성](../assets/audio/sfx/laureol-call.wav) | 0.78초 | 신호 실행 박. 한국어 합성 음성으로 제작했어요. |
+| [라우럴! 음성](../assets/audio/sfx/laureol-call.wav) | 0.78초 | 신호 실행 박. 한국어 대사를 [eSpeak NG](https://github.com/espeak-ng/espeak-ng/tree/1.52.0)로 합성한 뒤 [효과음 제작 스크립트](../tool/render_laureol_call.py)로 믹싱했어요. |
 | [관객 박수](../assets/audio/sfx/crowd-clap.wav) | 0.85초 | 관객이 준비를 마쳤을 때 짧게 재생해요. |
 | [관객 떼창](../assets/audio/sfx/crowd-singalong.wav) | 2.05초 | 상대 구역이 합류한 박에 재생해요. |
 | [발전기 작동](../assets/audio/sfx/generator-loop.wav) | 2.00초 | 발전기 가동 구간에서 반복해요. |

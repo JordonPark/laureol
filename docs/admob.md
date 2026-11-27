@@ -22,3 +22,19 @@ Android 앱 ID는 [AndroidManifest.xml](../android/app/src/main/AndroidManifest.
 2. 각 앱을 출시한 뒤 공식 스토어 등록정보를 AdMob의 해당 iOS·Android 앱에 연결한다.
 3. 스토어 개발자 웹사이트의 도메인 루트에 [app-ads.txt](https://jordonpark.github.io/app-ads.txt)를 게시하고 AdMob에서 소유권 확인과 앱 검토 상태를 확인한다. [Google app-ads.txt 게시 안내](https://support.google.com/admob/answer/9363762) · [Google 앱 검증 안내](https://support.google.com/admob/answer/14538460)
 4. 운영 지역과 앱 설정에 맞춰 AdMob 개인정보 메시지를 게시하고, 제출하는 스토어의 개인정보 공개 항목을 SDK 설정에 맞춰 확인한다. [Google Mobile Ads 개인정보 공개 안내](https://developers.google.com/admob/ios/privacy/data-disclosure)
+
+## App Store Connect 앱 개인정보
+
+**앱 개인정보 → 시작하기**에서 데이터 수집에 **예**를 선택한다. 아래 표는 iOS의 Google Mobile Ads 13.12.0 및 UMP 3.1.0에 포함된 개인정보 매니페스트를 현재 앱 설정에 대조한 입력 기준이다. 현재 앱은 제3자 배너를 사용하고 개발자 자체 광고·마케팅에는 이 데이터를 사용하지 않는다. 점수와 환경설정은 기기에만 저장한다. [Apple 입력 안내](https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy/) · [Google의 iOS 데이터 공개 안내](https://developers.google.com/admob/ios/privacy/data-disclosure)
+
+| Apple 데이터 유형 | 수집 목적 | 사용자에 연결 |
+| --- | --- | --- |
+| 대략적인 위치 (Coarse Location) | 제3자 광고, 분석, 앱 기능 | 예 |
+| 기기 ID (Device ID) | 제3자 광고, 분석 | 예 |
+| 제품 상호 작용 (Product Interaction) | 제3자 광고, 분석, 앱 기능 | 예 |
+| 광고 데이터 (Advertising Data) | 제3자 광고, 분석 | 예 |
+| 충돌 데이터 (Crash Data) | 분석 | 아니요 |
+| 성능 데이터 (Performance Data) | 제3자 광고, 분석, 앱 기능 | 아니요 |
+| 기타 진단 데이터 (Other Diagnostic Data) | 제3자 광고, 분석 | 아니요 |
+
+앱은 ATT를 요청하지 않고 Google에 비개인화 요청을 보낸다. 게시 전 **추적에 사용** 항목을 검토할 때는 Google Ads의 기기 ID 매니페스트가 SDK 전체 기능에서 추적 가능성을 표시하는 점도 고려한다. Apple은 타사 앱·사이트의 데이터와 광고 또는 광고 측정에 연결하는 행위까지 추적으로 정의한다. [Apple의 추적 정의](https://developer.apple.com/app-store/app-privacy-details/#tracking) · [Google의 iOS ATT 및 IDFA 안내](https://developers.google.com/admob/ios/privacy/idfa)
